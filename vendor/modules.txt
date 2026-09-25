@@ -1,0 +1,107 @@
+# cloud.google.com/go v0.123.0
+## explicit; go 1.24.0
+cloud.google.com/go/civil
+# github.com/MarkRosemaker/errpath v0.0.0-20260920172209-24fb928433b3
+## explicit; go 1.23.2
+github.com/MarkRosemaker/errpath
+# github.com/MarkRosemaker/json2yaml v0.0.0-20260920172209-522898d8cbe9
+## explicit; go 1.27
+github.com/MarkRosemaker/json2yaml
+# github.com/MarkRosemaker/jsonutil v0.0.0-20260920172211-f6e22a1a8311
+## explicit; go 1.27
+github.com/MarkRosemaker/jsonutil
+# github.com/MarkRosemaker/openapi v0.0.0-20260924204055-ab21ca1ec2da
+## explicit; go 1.27
+github.com/MarkRosemaker/openapi
+# github.com/MarkRosemaker/openapi-codegen v0.0.0-20260924220618-491cde13500a
+## explicit; go 1.27
+github.com/MarkRosemaker/openapi-codegen
+github.com/MarkRosemaker/openapi-codegen/cmd/openapi-codegen
+github.com/MarkRosemaker/openapi-codegen/config
+github.com/MarkRosemaker/openapi-codegen/ir
+github.com/MarkRosemaker/openapi-codegen/render
+# github.com/MarkRosemaker/openapi-compare v0.0.0-20260924204333-8165569366a9
+## explicit; go 1.27
+github.com/MarkRosemaker/openapi-compare/schema
+# github.com/MarkRosemaker/openapi-compress v0.0.0-20260924204625-bfef88893442
+## explicit; go 1.27
+github.com/MarkRosemaker/openapi-compress
+github.com/MarkRosemaker/openapi-compress/cmd/openapi-compress
+# github.com/MarkRosemaker/openapi-edit v0.0.0-20260924204333-5d7e8653d08b
+## explicit; go 1.27
+github.com/MarkRosemaker/openapi-edit
+# github.com/MarkRosemaker/openapi-enrich v0.0.0-20260924220249-4897701195d5
+## explicit; go 1.27
+github.com/MarkRosemaker/openapi-enrich
+github.com/MarkRosemaker/openapi-enrich/cassette
+github.com/MarkRosemaker/openapi-enrich/cmd/openapi-enrich
+github.com/MarkRosemaker/openapi-enrich/recorder
+# github.com/MarkRosemaker/openapi-flatten v0.0.0-20260924204353-870f41759615
+## explicit; go 1.27
+github.com/MarkRosemaker/openapi-flatten
+github.com/MarkRosemaker/openapi-flatten/cmd/openapi-flatten
+# github.com/MarkRosemaker/openapi-merge v0.0.0-20260924204333-85780a400025
+## explicit; go 1.27
+github.com/MarkRosemaker/openapi-merge
+# github.com/MarkRosemaker/ordmap v0.0.0-20260920172223-2eab4db34adb
+## explicit; go 1.27
+github.com/MarkRosemaker/ordmap
+# github.com/MarkRosemaker/yaml v0.0.0-20260920172227-27bebaf02fb5
+## explicit; go 1.27
+github.com/MarkRosemaker/yaml
+# github.com/MarkRosemaker/yaml2json v0.0.0-20260920172209-d64c22f91b8c
+## explicit; go 1.27
+github.com/MarkRosemaker/yaml2json
+# github.com/ettle/strcase v0.2.0
+## explicit; go 1.12
+github.com/ettle/strcase
+# github.com/go-api-libs/api v0.0.0-20260920172211-2e5733e71b56
+## explicit; go 1.27
+github.com/go-api-libs/api
+# github.com/go-api-libs/types v0.0.0-20260821232109-0cf45378823e
+## explicit; go 1.27
+github.com/go-api-libs/types
+# github.com/spf13/afero v1.15.0
+## explicit; go 1.23.0
+github.com/spf13/afero
+github.com/spf13/afero/internal/common
+github.com/spf13/afero/mem
+# golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba
+## explicit; go 1.26.0
+golang.org/x/exp/maps
+# golang.org/x/mod v0.41.0
+## explicit; go 1.26.0
+golang.org/x/mod/internal/lazyregexp
+golang.org/x/mod/module
+golang.org/x/mod/semver
+# golang.org/x/sync v0.23.0
+## explicit; go 1.26.0
+golang.org/x/sync/errgroup
+# golang.org/x/text v0.42.0
+## explicit; go 1.26.0
+golang.org/x/text/runes
+golang.org/x/text/transform
+golang.org/x/text/unicode/norm
+# golang.org/x/tools v0.50.0
+## explicit; go 1.26.0
+golang.org/x/tools/go/ast/astutil
+golang.org/x/tools/imports
+golang.org/x/tools/internal/event
+golang.org/x/tools/internal/event/core
+golang.org/x/tools/internal/event/keys
+golang.org/x/tools/internal/event/label
+golang.org/x/tools/internal/gocommand
+golang.org/x/tools/internal/gopathwalk
+golang.org/x/tools/internal/imports
+golang.org/x/tools/internal/modindex
+golang.org/x/tools/internal/stdlib
+# gopkg.in/yaml.v3 v3.0.1
+## explicit
+gopkg.in/yaml.v3
+# mvdan.cc/gofumpt v0.12.0
+## explicit; go 1.26.0
+mvdan.cc/gofumpt/format
+mvdan.cc/gofumpt/internal/govendor/go/doc/comment
+mvdan.cc/gofumpt/internal/govendor/go/format
+mvdan.cc/gofumpt/internal/govendor/go/printer
+mvdan.cc/gofumpt/internal/version

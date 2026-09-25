@@ -1,0 +1,10 @@
+{
+  "id": 182,
+  "emoji": "🎮",
+  "title": "Free Games API",
+  "description": "The GamerPower API provides access to a vast collection of free games, in-game loot, and ongoing giveaways without any restrictions or the need for authentication. Users can retrieve giveaway data through simple HTTP GET requests, making integration easy and seamless for developers and gamers alike.",
+  "documentation": "https://www.gamerpower.com/api-read",
+  "methods": 1,
+  "health": 95,
+  "source": "https://freepublicapis.com/free-games-api"
+}

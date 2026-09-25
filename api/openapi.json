@@ -1,0 +1,180 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Free Games API",
+    "description": "The GamerPower API provides access to a vast collection of free games, in-game loot, and ongoing giveaways without any restrictions or the need for authentication. Users can retrieve giveaway data through simple HTTP GET requests, making integration easy and seamless for developers and gamers alike.",
+    "version": "0.0.1"
+  },
+  "servers": [
+    {
+      "url": "http://www.gamerpower.com/api"
+    }
+  ],
+  "paths": {
+    "/giveaways": {
+      "get": {
+        "operationId": "ListGiveaways",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ListGiveawaysOkResponse"
+          }
+        }
+      }
+    },
+    "/worth": {
+      "get": {
+        "operationId": "ListAPIWorth",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ListAPIWorthOkResponse"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ListAPIWorthOk": {
+        "type": "object",
+        "properties": {
+          "active_giveaways_number": {
+            "type": "integer",
+            "example": 103
+          },
+          "worth_estimation_usd": {
+            "type": "string",
+            "example": "512.75"
+          }
+        },
+        "required": [
+          "active_giveaways_number",
+          "worth_estimation_usd"
+        ]
+      },
+      "ListGiveawaysOk": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/ListGiveawaysOkItem"
+        }
+      },
+      "ListGiveawaysOkItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 3792
+          },
+          "title": {
+            "type": "string",
+            "example": "Castlevania: 40th Anniversary (Mobile) Giveaway"
+          },
+          "worth": {
+            "type": "string",
+            "example": "N/A"
+          },
+          "thumbnail": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://www.gamerpower.com/offers/1/6ab6470a4ddf0.jpg"
+          },
+          "image": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://www.gamerpower.com/offers/1b/6ab6470a4ddf0.jpg"
+          },
+          "description": {
+            "type": "string",
+            "example": "Celebrate Castlevania’s 40th Anniversary and claim the original NES classic for free on the App Store and Google Play until October 24."
+          },
+          "instructions": {
+            "type": "string",
+            "example": "1. Click the button to visit the giveaway page.\r\n2. Download this game directly via App Store and Google Play before the offer expires.\r\n3. That´s it! Have fun!"
+          },
+          "open_giveaway_url": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://www.gamerpower.com/open/castlevania-40th-anniversary-mobile-giveaway"
+          },
+          "published_date": {
+            "type": "string",
+            "example": "2026-09-25 06:03:54"
+          },
+          "type": {
+            "type": "string",
+            "example": "Game"
+          },
+          "platforms": {
+            "type": "string",
+            "example": "Android, iOS"
+          },
+          "end_date": {
+            "type": "string",
+            "example": "2026-10-24 23:59:00"
+          },
+          "users": {
+            "type": "integer",
+            "example": 1830
+          },
+          "status": {
+            "type": "string",
+            "example": "Active"
+          },
+          "gamerpower_url": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://www.gamerpower.com/castlevania-40th-anniversary-mobile-giveaway"
+          },
+          "open_giveaway": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://www.gamerpower.com/open/castlevania-40th-anniversary-mobile-giveaway"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "worth",
+          "thumbnail",
+          "image",
+          "description",
+          "instructions",
+          "open_giveaway_url",
+          "published_date",
+          "type",
+          "platforms",
+          "end_date",
+          "users",
+          "status",
+          "gamerpower_url",
+          "open_giveaway"
+        ]
+      }
+    },
+    "responses": {
+      "ListAPIWorthOkResponse": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ListAPIWorthOk"
+            }
+          }
+        }
+      },
+      "ListGiveawaysOkResponse": {
+        "description": "OK",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ListGiveawaysOk"
+            }
+          }
+        }
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "API documentation",
+    "url": "https://www.gamerpower.com/api-read"
+  }
+}
