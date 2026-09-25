@@ -13,20 +13,22 @@
   "paths": {
     "/giveaways": {
       "get": {
+        "description": "Returns all active giveaways.",
         "operationId": "ListGiveaways",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/ListGiveawaysOkResponse"
+            "$ref": "#/components/responses/Giveaways"
           }
         }
       }
     },
     "/worth": {
       "get": {
-        "operationId": "ListAPIWorth",
+        "description": "Total live giveaways & worth estimation in US dollars.",
+        "operationId": "GetWorth",
         "responses": {
           "200": {
-            "$ref": "#/components/responses/ListAPIWorthOkResponse"
+            "$ref": "#/components/responses/Worth"
           }
         }
       }
@@ -34,30 +36,7 @@
   },
   "components": {
     "schemas": {
-      "ListAPIWorthOk": {
-        "type": "object",
-        "properties": {
-          "active_giveaways_number": {
-            "type": "integer",
-            "example": 103
-          },
-          "worth_estimation_usd": {
-            "type": "string",
-            "example": "512.75"
-          }
-        },
-        "required": [
-          "active_giveaways_number",
-          "worth_estimation_usd"
-        ]
-      },
-      "ListGiveawaysOk": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/ListGiveawaysOkItem"
-        }
-      },
-      "ListGiveawaysOkItem": {
+      "Giveaway": {
         "type": "object",
         "properties": {
           "id": {
@@ -148,25 +127,48 @@
           "gamerpower_url",
           "open_giveaway"
         ]
+      },
+      "Giveaways": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Giveaway"
+        }
+      },
+      "Worth": {
+        "type": "object",
+        "properties": {
+          "active_giveaways_number": {
+            "type": "integer",
+            "example": 103
+          },
+          "worth_estimation_usd": {
+            "type": "string",
+            "example": "512.75"
+          }
+        },
+        "required": [
+          "active_giveaways_number",
+          "worth_estimation_usd"
+        ]
       }
     },
     "responses": {
-      "ListAPIWorthOkResponse": {
+      "Giveaways": {
         "description": "OK",
         "content": {
           "application/json": {
             "schema": {
-              "$ref": "#/components/schemas/ListAPIWorthOk"
+              "$ref": "#/components/schemas/Giveaways"
             }
           }
         }
       },
-      "ListGiveawaysOkResponse": {
+      "Worth": {
         "description": "OK",
         "content": {
           "application/json": {
             "schema": {
-              "$ref": "#/components/schemas/ListGiveawaysOk"
+              "$ref": "#/components/schemas/Worth"
             }
           }
         }

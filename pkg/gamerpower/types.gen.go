@@ -21,17 +21,8 @@ var jsonOpts = json.JoinOptions(
 	)),
 )
 
-// ListAPIWorthOk defines a model
-type ListAPIWorthOk struct {
-	ActiveGiveawaysNumber int    `json:"active_giveaways_number"`
-	WorthEstimationUsd    string `json:"worth_estimation_usd,omitzero"`
-}
-
-// ListGiveawaysOk defines a model
-type ListGiveawaysOk []ListGiveawaysOkItem
-
-// ListGiveawaysOkItem defines a model
-type ListGiveawaysOkItem struct {
+// Giveaway defines a model
+type Giveaway struct {
 	ID              int     `json:"id"`
 	Title           string  `json:"title,omitzero"`
 	Worth           string  `json:"worth,omitzero"`
@@ -48,4 +39,13 @@ type ListGiveawaysOkItem struct {
 	Status          string  `json:"status,omitzero"`
 	GamerpowerURL   url.URL `json:"gamerpower_url,omitzero"`
 	OpenGiveaway    url.URL `json:"open_giveaway,omitzero"`
+}
+
+// Giveaways defines a model
+type Giveaways []Giveaway
+
+// Worth defines a model
+type Worth struct {
+	ActiveGiveawaysNumber int    `json:"active_giveaways_number"`
+	WorthEstimationUsd    string `json:"worth_estimation_usd,omitzero"`
 }

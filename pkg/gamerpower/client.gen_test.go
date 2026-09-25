@@ -131,7 +131,7 @@ func TestClient_Error(t *testing.T) {
 		})
 	})
 
-	t.Run("ListAPIWorth", func(t *testing.T) {
+	t.Run("GetWorth", func(t *testing.T) {
 		t.Run("transport error", func(t *testing.T) {
 			c, err := NewClient(WithHTTPClient(&http.Client{Transport: roundTripFunc(
 				func(*http.Request) (*http.Response, error) { return nil, io.EOF },
@@ -140,7 +140,7 @@ func TestClient_Error(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if _, err := c.ListAPIWorth(t.Context()); err == nil {
+			if _, err := c.GetWorth(t.Context()); err == nil {
 				t.Fatal("expected error")
 			} else if !errors.Is(err, io.EOF) {
 				t.Fatalf("want: %v, got: %v", io.EOF, err)
@@ -160,7 +160,7 @@ func TestClient_Error(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if _, err := c.ListAPIWorth(t.Context()); err == nil {
+			if _, err := c.GetWorth(t.Context()); err == nil {
 				t.Fatal("expected error")
 			} else if apiErr, ok := errors.AsType[*api.Error](err); !ok {
 				t.Fatalf("got: %T, want: *api.Error", err)
@@ -188,7 +188,7 @@ func TestClient_Error(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if _, err := c.ListAPIWorth(t.Context()); err == nil {
+			if _, err := c.GetWorth(t.Context()); err == nil {
 				t.Fatal("expected error")
 			} else if !errors.Is(err, api.ErrUnknownContentType) {
 				t.Fatalf("want: %v, got: %v", api.ErrUnknownContentType, err)
@@ -213,7 +213,7 @@ func TestClient_Error(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if _, err := c.ListAPIWorth(t.Context()); err == nil {
+			if _, err := c.GetWorth(t.Context()); err == nil {
 				t.Fatal("expected error")
 			} else if decErr, ok := errors.AsType[*api.DecodingError](err); !ok {
 				t.Fatalf("got: %T, want: *api.DecodingError", err)
@@ -307,7 +307,7 @@ func TestClient_Interactions(t *testing.T) {
 		t.Fatalf("ListGiveaways: %v", err)
 	}
 
-	if _, err := c.ListAPIWorth(ctx); err != nil {
-		t.Fatalf("ListAPIWorth: %v", err)
+	if _, err := c.GetWorth(ctx); err != nil {
+		t.Fatalf("GetWorth: %v", err)
 	}
 }

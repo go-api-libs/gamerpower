@@ -65,9 +65,11 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	return c, nil
 }
 
-// GET /giveaways
-func (c *Client) ListGiveaways(ctx context.Context) (ListGiveawaysOk, error) {
-	out, err := c.ListGiveawaysWithResult[ListGiveawaysOk](ctx)
+// Returns all active giveaways.
+//
+//	GET /giveaways
+func (c *Client) ListGiveaways(ctx context.Context) (Giveaways, error) {
+	out, err := c.ListGiveawaysWithResult[Giveaways](ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +77,10 @@ func (c *Client) ListGiveaways(ctx context.Context) (ListGiveawaysOk, error) {
 	return *out, nil
 }
 
-// GET /giveaways
+// Returns all active giveaways.
+// You can define a custom result to unmarshal the response into.
+//
+//	GET /giveaways
 func (c *Client) ListGiveawaysWithResult[R any](ctx context.Context) (*R, error) {
 	u := c.baseURL.JoinPath("giveaways")
 	req := (&http.Request{
@@ -115,13 +120,18 @@ func (c *Client) ListGiveawaysWithResult[R any](ctx context.Context) (*R, error)
 	}
 }
 
-// GET /worth
-func (c *Client) ListAPIWorth(ctx context.Context) (*ListAPIWorthOk, error) {
-	return c.ListAPIWorthWithResult[ListAPIWorthOk](ctx)
+// Total live giveaways & worth estimation in US dollars.
+//
+//	GET /worth
+func (c *Client) GetWorth(ctx context.Context) (*Worth, error) {
+	return c.GetWorthWithResult[Worth](ctx)
 }
 
-// GET /worth
-func (c *Client) ListAPIWorthWithResult[R any](ctx context.Context) (*R, error) {
+// Total live giveaways & worth estimation in US dollars.
+// You can define a custom result to unmarshal the response into.
+//
+//	GET /worth
+func (c *Client) GetWorthWithResult[R any](ctx context.Context) (*R, error) {
 	u := c.baseURL.JoinPath("worth")
 	req := (&http.Request{
 		Header: http.Header{
