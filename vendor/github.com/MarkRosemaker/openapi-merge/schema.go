@@ -287,16 +287,7 @@ func mergeByType(a, b *openapi.Schema, tp openapi.DataType) error {
 		}
 	case openapi.TypeBoolean, openapi.TypeInteger, openapi.TypeNumber: // nothing to do
 	case openapi.TypeArray:
-		// guard against nil pointer if a schema is invalid
-		if a.Items == nil {
-			a.Items = defaultSchemaRef()
-		}
-
-		if b.Items == nil {
-			b.Items = defaultSchemaRef()
-		}
-
-		if err := Schema(a.Items.Value, b.Items.Value, false); err != nil {
+		if err := mergeArrayItems(a, b); err != nil {
 			return err
 		}
 	default:
@@ -304,6 +295,73 @@ func mergeByType(a, b *openapi.Schema, tp openapi.DataType) error {
 	}
 
 	return nil
+}
+
+// mergeArrayItems merges b's array shape into a's. When both describe a
+// fixed-length tuple of the same length, each position merges against its
+// counterpart via PrefixItems, the same way Items already does for a plain
+// list. Otherwise -- tuple lengths disagree, or only one side is a tuple at
+// all -- positions can't line up, so the result keeps both shapes as
+// alternatives instead of forcing a lossy merge between them.
+func mergeArrayItems(a, b *openapi.Schema) error {
+	switch {
+	case len(a.PrefixItems) == 0 && len(b.PrefixItems) == 0:
+		return mergeItemsField(a, b)
+	case len(a.PrefixItems) == len(b.PrefixItems):
+		for i, ai := range a.PrefixItems {
+			if err := Schema(ai.Value, b.PrefixItems[i].Value, false); err != nil {
+				return &errpath.ErrField{Field: "prefixItems", Err: &errpath.ErrIndex{Index: i, Err: err}}
+			}
+		}
+
+		// items still applies to any element beyond the two sides' shared
+		// prefixItems length; merge it too when either side sets it.
+		if a.Items != nil || b.Items != nil {
+			return mergeItemsField(a, b)
+		}
+
+		return nil
+	default:
+		mergeArrayShapeMismatch(a, b)
+		return nil
+	}
+}
+
+// mergeItemsField merges a.Items with b.Items, defaulting either side that
+// is unset to the empty (matches-anything) schema first.
+func mergeItemsField(a, b *openapi.Schema) error {
+	// guard against nil pointer if a schema is invalid
+	if a.Items == nil {
+		a.Items = defaultSchemaRef()
+	}
+
+	if b.Items == nil {
+		b.Items = defaultSchemaRef()
+	}
+
+	return Schema(a.Items.Value, b.Items.Value, false)
+}
+
+// mergeArrayShapeMismatch documents a and b -- both arrays whose shapes
+// can't be reconciled positionally -- as two alternatives via oneOf,
+// mirroring mergeDateTimeOrTimestamp: forcing an incompatible merge here
+// would silently drop one shape's information.
+func mergeArrayShapeMismatch(a, b *openapi.Schema) {
+	aCopy, bCopy := *a, *b
+	aCopy.Title, aCopy.Description = "", ""
+	bCopy.Title, bCopy.Description = "", ""
+
+	merged := openapi.Schema{
+		Title:       a.Title,
+		Description: a.Description,
+		OneOf: openapi.SchemaRefList{
+			{Value: &aCopy},
+			{Value: &bCopy},
+		},
+	}
+
+	*a = merged
+	*b = merged
 }
 
 // mergeObjectProperties merges b's properties into a's, either directly or,
