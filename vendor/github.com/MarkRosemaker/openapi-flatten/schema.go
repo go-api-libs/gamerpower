@@ -34,24 +34,32 @@ func schemaRef(d *openapi.Document, s *openapi.SchemaRef, name string, mode mode
 			moveSchemaToComponents(d, name, s)
 		} // else just string, no need to move to components
 	case openapi.TypeArray:
-		items := s.Value.Items.Value
-		switch items.Type {
-		case openapi.TypeInteger: // do nothing, just []int
-		case openapi.TypeNumber: // do nothing, just []float32 or []float64
-		case openapi.TypeString:
-			if items.Enum != nil && mode != neverMove {
-				moveSchemaToComponents(d, name, s)
-			} // else just []string, no need to move to components
-		case openapi.TypeObject:
-			if len(items.Properties) > 0 && mode != neverMove {
+		if len(s.Value.PrefixItems) > 0 {
+			// a tuple has a defined shape, positional but no less real than
+			// an object's properties: give it a name of its own the same way.
+			if mode != neverMove {
 				moveSchemaToComponents(d, name, s)
 			}
-		case openapi.TypeBoolean: // do nothing, just []bool
-		case openapi.TypeNull: // do nothing, just []null
-		case openapi.TypeArray: // TODO: later
-		case "": // no explicit type — items uses anyOf / oneOf / allOf (e.g. nullable union)
-		default:
-			return fmt.Errorf("unimplemented item type %q", items.Type)
+		} else {
+			items := s.Value.Items.Value
+			switch items.Type {
+			case openapi.TypeInteger: // do nothing, just []int
+			case openapi.TypeNumber: // do nothing, just []float32 or []float64
+			case openapi.TypeString:
+				if items.Enum != nil && mode != neverMove {
+					moveSchemaToComponents(d, name, s)
+				} // else just []string, no need to move to components
+			case openapi.TypeObject:
+				if len(items.Properties) > 0 && mode != neverMove {
+					moveSchemaToComponents(d, name, s)
+				}
+			case openapi.TypeBoolean: // do nothing, just []bool
+			case openapi.TypeNull: // do nothing, just []null
+			case openapi.TypeArray: // TODO: later
+			case "": // no explicit type — items uses anyOf / oneOf / allOf (e.g. nullable union)
+			default:
+				return fmt.Errorf("unimplemented item type %q", items.Type)
+			}
 		}
 	case openapi.TypeObject: // move to components
 		if len(s.Value.Properties) > 0 && mode != neverMove {
@@ -85,16 +93,22 @@ func schema(d *openapi.Document, s *openapi.Schema, name string) error {
 		return fmt.Errorf("unimplemented schema type %q", s.Type)
 	}
 
-	if err := schemaRefList(d, s.AllOf, name+"AllOf"); err != nil {
+	if err := schemaRefList(d, s.AllOf, name+"AllOf", neverMove); err != nil {
 		return &errpath.ErrField{Field: "allOf", Err: err}
 	}
 
-	if err := schemaRefList(d, s.OneOf, name+"OneOf"); err != nil {
+	if err := schemaRefList(d, s.OneOf, name+"OneOf", neverMove); err != nil {
 		return &errpath.ErrField{Field: "oneOf", Err: err}
 	}
 
-	if err := schemaRefList(d, s.AnyOf, name+"AnyOf"); err != nil {
+	if err := schemaRefList(d, s.AnyOf, name+"AnyOf", neverMove); err != nil {
 		return &errpath.ErrField{Field: "anyOf", Err: err}
+	}
+
+	// each position is a real, reusable shape, the same as an object property
+	// just addressed by index instead of by name.
+	if err := schemaRefList(d, s.PrefixItems, name+"Item", moveIfNecessary); err != nil {
+		return &errpath.ErrField{Field: "prefixItems", Err: err}
 	}
 
 	if s.Items != nil {
@@ -123,9 +137,9 @@ func moveSchemaToComponents(d *openapi.Document, name string, s *openapi.SchemaR
 	s.Ref = newRef("schemas", name)
 }
 
-func schemaRefList(d *openapi.Document, ss openapi.SchemaRefList, prefix string) error {
+func schemaRefList(d *openapi.Document, ss openapi.SchemaRefList, prefix string, mode mode) error {
 	for i, s := range ss {
-		if err := schemaRef(d, s, fmt.Sprintf("%s%d", prefix, i), neverMove); err != nil {
+		if err := schemaRef(d, s, fmt.Sprintf("%s%d", prefix, i), mode); err != nil {
 			return &errpath.ErrIndex{Index: i, Err: err}
 		}
 	}
