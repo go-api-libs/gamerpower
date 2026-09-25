@@ -173,6 +173,7 @@ const (
 	SchemaKindAllOf                    // allOf composition (struct with embedded types)
 	SchemaKindMap
 	SchemaKindUnion // untagged oneOf/anyOf composition (pointer-bag struct)
+	SchemaKindTuple // fixed-length, positionally-typed array (prefixItems)
 )
 
 // UnionVariant is one member of a SchemaKindUnion's pointer bag.

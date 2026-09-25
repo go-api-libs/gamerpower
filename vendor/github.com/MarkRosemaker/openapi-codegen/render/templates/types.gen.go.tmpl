@@ -165,6 +165,69 @@ func (v *{{$typeName}}) MarshalJSONTo(enc *jsontext.Encoder) error {
 
 	return fmt.Errorf("{{$typeName}}: no variant set")
 }
+{{- else if eq .Kind 6}}{{/* SchemaKindTuple */}}
+{{- $typeName := .Name}}
+{{- $n := len .Fields}}
+type {{.Name}} struct {
+	{{- range .Fields}}
+	{{.Name}} {{.Type}}
+	{{- end}}
+}
+
+func (a *{{$typeName}}) Items(yield func(int, any) bool) {
+	for i, v := range []any{ {{- range $i, $f := .Fields}}{{if $i}}, {{end}}&a.{{$f.Name}}{{end}} } {
+		if !yield(i, v) {
+			return
+		}
+	}
+}
+
+// UnmarshalJSONFrom implements [json.UnmarshalerFrom].
+func (a *{{$typeName}}) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if k := dec.PeekKind(); k != jsontext.KindBeginArray {
+		return &json.SemanticError{JSONKind: k}
+	}
+
+	if _, err := dec.ReadToken(); err != nil {
+		return err
+	}
+
+	for _, f := range a.Items {
+		if dec.PeekKind() == jsontext.KindEndArray {
+			return &json.SemanticError{Err: fmt.Errorf("array shorter than {{$n}}")}
+		}
+
+		if err := json.UnmarshalDecode(dec, f); err != nil {
+			return err
+		}
+	}
+
+	if k := dec.PeekKind(); k != jsontext.KindEndArray {
+		return &json.SemanticError{JSONKind: k, Err: fmt.Errorf("array longer than {{$n}}")}
+	}
+
+	_, err := dec.ReadToken()
+	return err
+}
+
+// MarshalJSONTo implements [json.MarshalerTo].
+func (a {{$typeName}}) MarshalJSONTo(enc *jsontext.Encoder) error {
+	if err := enc.WriteToken(jsontext.BeginArray); err != nil {
+		return err
+	}
+
+	for _, v := range a.Items {
+		if err := json.MarshalEncode(enc, v); err != nil {
+			return err
+		}
+	}
+
+	if err := enc.WriteToken(jsontext.EndArray); err != nil {
+		return err
+	}
+
+	return nil
+}
 {{ else }}
 // TODO: unimplemented schema kind {{ .Kind }}
 {{- end }}

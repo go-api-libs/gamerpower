@@ -9,6 +9,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/MarkRosemaker/errpath"
 	"github.com/MarkRosemaker/openapi"
 	"github.com/ettle/strcase"
 )
@@ -253,6 +254,10 @@ func fromSchema(name string, s *openapi.Schema) (*Schema, error) {
 
 		return fromScalarSchema(name, s)
 	case openapi.TypeArray:
+		if len(s.PrefixItems) > 0 {
+			return fromTupleSchema(name, s)
+		}
+
 		return fromArraySchema(name, s)
 	case "":
 		if isDateTimeOrIntegerOneOf(s) {
@@ -552,6 +557,34 @@ func fromArraySchema(name string, s *openapi.Schema) (*Schema, error) {
 		Description: getDescription(s, name),
 		Kind:        SchemaKindAlias,
 		Type:        aliasType.String(),
+	}, nil
+}
+
+// fromTupleSchema declares a named component for a fixed-length,
+// positionally-typed array (JSON Schema's prefixItems): a struct field per
+// position, since Go has no tuple type and each position has its own type
+// throughout every sample -- not one shared item type like a plain array.
+func fromTupleSchema(name string, s *openapi.Schema) (*Schema, error) {
+	width := len(strconv.Itoa(len(s.PrefixItems) - 1))
+
+	fields := make([]Field, len(s.PrefixItems))
+	for i, p := range s.PrefixItems {
+		tp, err := SchemaRefGoType(p)
+		if err != nil {
+			return nil, &errpath.ErrField{Field: "prefixItems", Err: &errpath.ErrIndex{Index: i, Err: err}}
+		}
+
+		fields[i] = Field{
+			Name: fmt.Sprintf("Item%0*d", width, i),
+			Type: tp.String(),
+		}
+	}
+
+	return &Schema{
+		Name:        name,
+		Description: getDescription(s, name),
+		Kind:        SchemaKindTuple,
+		Fields:      fields,
 	}, nil
 }
 
