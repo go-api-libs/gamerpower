@@ -82,29 +82,6 @@ func run(ctx context.Context) error {
 		}
 	}
 
-	if err := enrich.Enrich(doc, tr.Interactions); err != nil {
-		return err
-	}
-
-	// Sort responses and components (but not paths to keep the order)
-	for _, path := range doc.Paths {
-		for _, op := range path.Operations {
-			op.Responses.Sort()
-		}
-	}
-
-	doc.Components.SortMaps()
-
-	if wasValid {
-		if err := doc.Validate(); err != nil {
-			return fmt.Errorf("produced invalid doc: %w", err)
-		}
-	}
-
-	if err := doc.WriteToFile(specPath); err != nil {
-		return err
-	}
-
 	ias := tr.Interactions
 
 	if strings.HasPrefix(doc.Info.Title, "Habitica") {
@@ -130,6 +107,29 @@ func run(ctx context.Context) error {
 	}
 
 	if err := ias.WriteFile(iaPath); err != nil {
+		return err
+	}
+
+	if err := enrich.Enrich(doc, tr.Interactions); err != nil {
+		return err
+	}
+
+	// Sort responses and components (but not paths to keep the order)
+	for _, path := range doc.Paths {
+		for _, op := range path.Operations {
+			op.Responses.Sort()
+		}
+	}
+
+	doc.Components.SortMaps()
+
+	if wasValid {
+		if err := doc.Validate(); err != nil {
+			return fmt.Errorf("produced invalid doc: %w", err)
+		}
+	}
+
+	if err := doc.WriteToFile(specPath); err != nil {
 		return err
 	}
 
