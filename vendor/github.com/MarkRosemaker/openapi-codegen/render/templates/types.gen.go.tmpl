@@ -17,7 +17,7 @@ import (
 
 var jsonOpts = json.JoinOptions(
 		json.RejectUnknownMembers(true),
-		{{- if or .HasURLFields .HasDurationFields }}
+		{{- if or .HasURLFields .HasDurationFields .HasUnixTimeFields }}
 		json.WithMarshalers(json.JoinMarshalers(
 			{{- if .HasURLFields }}
 			json.MarshalToFunc(jsonutil.URLMarshal),
@@ -25,9 +25,12 @@ var jsonOpts = json.JoinOptions(
 			{{- if .HasDurationFields }}
 			json.MarshalToFunc(jsonutil.DurationMarshalIntSeconds),
 			{{- end }}
+			{{- if .HasUnixTimeFields }}
+			json.MarshalToFunc(jsonutil.TimeMarshalIntUnix),
+			{{- end }}
 		)),
 		{{- end }}
-		{{- if or .HasURLFields .HasDateTimeOrIntFields .HasDurationFields }}
+		{{- if or .HasURLFields .HasDateTimeOrIntFields .HasDurationFields .HasUnixTimeFields }}
 		json.WithUnmarshalers(json.JoinUnmarshalers(
 			{{- if .HasURLFields }}
 			json.UnmarshalFromFunc(jsonutil.URLUnmarshal),
@@ -37,6 +40,9 @@ var jsonOpts = json.JoinOptions(
 			{{- end }}
 			{{- if .HasDurationFields }}
 			json.UnmarshalFromFunc(jsonutil.DurationUnmarshalIntSeconds),
+			{{- end }}
+			{{- if .HasUnixTimeFields }}
+			json.UnmarshalFromFunc(jsonutil.TimeUnmarshalIntUnix),
 			{{- end }}
 		)),
 		{{- end }}

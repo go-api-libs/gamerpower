@@ -212,6 +212,10 @@ func objectGoType(s *openapi.Schema) (*GoType, error) {
 func FromComponentSchemas(schemas openapi.Schemas) ([]Schema, error) {
 	result := make([]Schema, 0, len(schemas))
 	for name, s := range schemas.ByIndex() {
+		if override := goNameOverride(s); override != "" {
+			name = override
+		}
+
 		irSchema, err := fromSchema(name, s)
 		if err != nil {
 			return nil, fmt.Errorf("schema %q: %w", name, err)
@@ -347,6 +351,23 @@ func getDescription(s *openapi.Schema, name string) string {
 	return fmt.Sprintf("%s defines a model", name)
 }
 
+// goNameOverride returns the schema's x-go-name extension, or "" if unset.
+// See https://github.com/oapi-codegen/oapi-codegen/blob/main/docs/extensions.md#x-go-name.
+func goNameOverride(s *openapi.Schema) string {
+	if len(s.Extensions) == 0 {
+		return ""
+	}
+
+	var ext struct {
+		GoName string `json:"x-go-name"`
+	}
+	if err := json.Unmarshal(s.Extensions, &ext); err != nil {
+		return ""
+	}
+
+	return ext.GoName
+}
+
 func fromAllOfSchema(name string, s *openapi.Schema) (*Schema, error) {
 	requiredSet := make(map[string]bool)
 	for _, r := range s.Required {
@@ -422,14 +443,24 @@ func getField(jsonName string, propRef *openapi.SchemaRef, requiredSet map[strin
 
 	ref := cmp.Or(propRef.Ref, &openapi.Reference{})
 
+	fieldName := fieldGoName(jsonName)
+	// only from an inline schema: a $ref'd component's own x-go-name renames
+	// that type, not every field that happens to reference it.
+	if propRef.Ref == nil {
+		if override := goNameOverride(v); override != "" {
+			fieldName = override
+		}
+	}
+
 	return Field{
-		Name:            fieldGoName(jsonName),
+		Name:            fieldName,
 		JSONName:        jsonName,
 		Type:            goType.String(),
 		JSONTag:         buildJSONTag(jsonName, v.Type, v.Format, required),
 		Description:     cmp.Or(ref.Description, v.Description),
 		Required:        required,
 		IsDateTimeOrInt: isDateTimeOrIntegerOneOf(v),
+		IsUnixTime:      goType.Name == "time.Time" && v.Type == openapi.TypeInteger,
 	}, nil
 }
 
@@ -574,8 +605,17 @@ func fromTupleSchema(name string, s *openapi.Schema) (*Schema, error) {
 			return nil, &errpath.ErrField{Field: "prefixItems", Err: &errpath.ErrIndex{Index: i, Err: err}}
 		}
 
+		fieldName := fmt.Sprintf("Item%0*d", width, i)
+		// only from an inline schema, same as an object property: a $ref'd
+		// position's own x-go-name renames that type, not this position.
+		if p.Ref == nil {
+			if override := goNameOverride(p.Value); override != "" {
+				fieldName = override
+			}
+		}
+
 		fields[i] = Field{
-			Name: fmt.Sprintf("Item%0*d", width, i),
+			Name: fieldName,
 			Type: tp.String(),
 		}
 	}

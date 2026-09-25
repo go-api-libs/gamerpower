@@ -24,6 +24,7 @@ type Document struct {
 	HasDurationFields      bool        `json:"hasDurationFields,omitzero"`
 	HasDateFields          bool        `json:"hasDateFields,omitzero"`
 	HasDateTimeOrIntFields bool        `json:"hasDateTimeOrIntFields,omitzero"`
+	HasUnixTimeFields      bool        `json:"hasUnixTimeFields,omitzero"`
 
 	// HasServerOverrides is true when any path item names a server of its own,
 	// which is what the generated serverURL helper is for.
@@ -199,6 +200,12 @@ type Field struct {
 	// date-time string and an integer. The Go type is time.Time, but a custom
 	// (un)marshaller is required to accept either form on the wire.
 	IsDateTimeOrInt bool `json:"isDateTimeOrInt,omitzero"`
+
+	// IsUnixTime is true when Type is time.Time but the property's schema
+	// itself is an integer (format: date-time), not a date-time string --
+	// see [integerGoType]. A custom (un)marshaller is required to encode and
+	// decode it as a unix timestamp instead of RFC 3339.
+	IsUnixTime bool `json:"isUnixTime,omitzero"`
 }
 
 // EnumValue is one member of an enum type.
