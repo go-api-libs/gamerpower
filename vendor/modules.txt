@@ -13,7 +13,7 @@ github.com/MarkRosemaker/jsonutil
 # github.com/MarkRosemaker/openapi v0.0.0-20260925151750-5adf9ba8ff6b
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi
-# github.com/MarkRosemaker/openapi-codegen v0.0.0-20260925175532-1e330116465b
+# github.com/MarkRosemaker/openapi-codegen v0.0.0-20260925185414-71ca34a15edf
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-codegen
 github.com/MarkRosemaker/openapi-codegen/cmd/openapi-codegen
@@ -23,7 +23,7 @@ github.com/MarkRosemaker/openapi-codegen/render
 # github.com/MarkRosemaker/openapi-compare v0.0.0-20260925152010-e9740f154291
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-compare/schema
-# github.com/MarkRosemaker/openapi-compress v0.0.0-20260924204625-bfef88893442
+# github.com/MarkRosemaker/openapi-compress v0.0.0-20260925183241-fc4ab6b2a0ac
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-compress
 github.com/MarkRosemaker/openapi-compress/cmd/openapi-compress
