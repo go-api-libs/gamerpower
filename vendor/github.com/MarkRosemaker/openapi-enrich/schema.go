@@ -3,6 +3,7 @@ package enrich
 import (
 	"bytes"
 	"encoding/json/jsontext"
+	json "encoding/json/v2"
 	"fmt"
 	"net"
 	"net/url"
@@ -173,34 +174,82 @@ func isNumericKey(s string) bool {
 func decodeArraySchema(dec *jsontext.Decoder) (*openapi.Schema, error) {
 	s := &openapi.Schema{Type: openapi.TypeArray}
 
-	var itemSchema *openapi.Schema
+	var elems []*openapi.Schema
 	for dec.PeekKind() != ']' {
 		elem, err := decodeSchema(dec)
 		if err != nil {
 			return nil, err
 		}
 
-		if itemSchema == nil {
-			itemSchema = elem
-		} else {
-			if err := merge.Schema(itemSchema, elem, false); err != nil {
-				return nil, fmt.Errorf("merging array items: %w", err)
-			}
-		}
+		elems = append(elems, elem)
 	}
 
 	if _, err := dec.ReadToken(); err != nil { // consume ']'
 		return nil, err
 	}
 
-	if itemSchema == nil {
+	if len(elems) == 0 {
 		// empty array → placeholder object items, refined on non-empty array
-		itemSchema = &openapi.Schema{Type: openapi.TypeObject, Example: jsontext.Value("null")}
+		s.Items = &openapi.SchemaRef{Value: &openapi.Schema{Type: openapi.TypeObject, Example: jsontext.Value("null")}}
+		return s, nil
 	}
 
-	s.Items = &openapi.SchemaRef{Value: itemSchema}
+	if item, ok := mergeHomogeneous(elems); ok {
+		s.Items = &openapi.SchemaRef{Value: item}
+		return s, nil
+	}
+
+	// elems can't merge into one schema: a fixed-size, positionally-typed
+	// array (e.g. OpenSky's state vectors: [icao24 string, ..., time_position
+	// int, ..., on_ground bool, ...]) mixes types by position, which
+	// prefixItems -- not items -- is meant to describe.
+	s.PrefixItems = make(openapi.SchemaRefList, len(elems))
+	for i, elem := range elems {
+		s.PrefixItems[i] = &openapi.SchemaRef{Value: elem}
+	}
 
 	return s, nil
+}
+
+// mergeHomogeneous attempts to merge every element into a single schema,
+// succeeding whenever they describe a plain, arbitrary-length list; ok is
+// false the moment two elements' types genuinely disagree. It works on
+// clones throughout: decodeArraySchema needs elems left untouched to fall
+// back to prefixItems on failure, and merge.Schema mutates both of its
+// arguments even when it ultimately returns an error partway through.
+func mergeHomogeneous(elems []*openapi.Schema) (_ *openapi.Schema, ok bool) {
+	item, err := cloneSchema(elems[0])
+	if err != nil {
+		return nil, false
+	}
+
+	for _, elem := range elems[1:] {
+		clone, err := cloneSchema(elem)
+		if err != nil {
+			return nil, false
+		}
+
+		if err := merge.Schema(item, clone, false); err != nil {
+			return nil, false
+		}
+	}
+
+	return item, true
+}
+
+// cloneSchema deep-copies s via a JSON round-trip.
+func cloneSchema(s *openapi.Schema) (*openapi.Schema, error) {
+	data, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+
+	clone := &openapi.Schema{}
+	if err := json.Unmarshal(data, clone); err != nil {
+		return nil, err
+	}
+
+	return clone, nil
 }
 
 // stringFormat detects the special format for a string value.
