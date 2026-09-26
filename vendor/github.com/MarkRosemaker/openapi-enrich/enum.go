@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
-	"fmt"
 
+	"github.com/MarkRosemaker/errpath"
 	"github.com/MarkRosemaker/openapi"
 	"github.com/MarkRosemaker/openapi-enrich/cassette"
 )
@@ -58,7 +58,7 @@ func growEnumsValue(s *openapi.Schema, v any) error {
 			}
 
 			if err := growEnumsValue(propRef.Value, val); err != nil {
-				return fmt.Errorf("property %q: %w", key, err)
+				return &errpath.ErrField{Field: "properties", Err: &errpath.ErrKey{Key: key, Err: err}}
 			}
 		}
 
@@ -69,7 +69,7 @@ func growEnumsValue(s *openapi.Schema, v any) error {
 				}
 
 				if err := growEnumsValue(s.AdditionalProperties.Value, val); err != nil {
-					return fmt.Errorf("additionalProperties %q: %w", key, err)
+					return &errpath.ErrField{Field: "additionalProperties", Err: &errpath.ErrKey{Key: key, Err: err}}
 				}
 			}
 		}
@@ -82,7 +82,7 @@ func growEnumsValue(s *openapi.Schema, v any) error {
 
 		for i, elem := range arr {
 			if err := growEnumsValue(s.Items.Value, elem); err != nil {
-				return fmt.Errorf("[%d]: %w", i, err)
+				return &errpath.ErrIndex{Index: i, Err: err}
 			}
 		}
 

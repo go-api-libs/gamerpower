@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/MarkRosemaker/errpath"
 	"github.com/MarkRosemaker/openapi"
 	"github.com/MarkRosemaker/openapi-enrich/cassette"
 	merge "github.com/MarkRosemaker/openapi-merge"
@@ -122,7 +123,7 @@ func analyzeInteraction(doc *openapi.Document, ia *cassette.Interaction) error {
 
 	// 9. Process response.
 	if err := processResponse(op, &ia.Response); err != nil {
-		return fmt.Errorf("response: %w", err)
+		return &errpath.ErrField{Field: "response", Err: err}
 	}
 
 	return nil
@@ -378,7 +379,7 @@ func processResponse(op *openapi.Operation, resp *cassette.Response) error {
 		}
 
 		if err := growEnums(mt.Schema.Value, resp.Body); err != nil {
-			return fmt.Errorf("content: %w", err)
+			return &errpath.ErrField{Field: "content", Err: err}
 		}
 	}
 
