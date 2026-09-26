@@ -34,6 +34,15 @@ cost you something.
   request stops being mergeable, say so and stop — that is the instruction
   arriving, and it is not yours to give yourself.
 
+## Cross-repo dependencies
+
+Fixing a bug in one repository ends at that repository's pull request.
+Never bump another repository's dependency on it, vendor the fix, or open
+a pull request there yourself — not even to pick up your own merged fix.
+Propagating a fix downstream is the owner's decision: they decide which
+of their repositories takes it, and when. Report the fix as merged and
+stop.
+
 ## Committing
 
 - `make ready` passes before every commit. It regenerates what the
@@ -60,6 +69,17 @@ Edit the directory, never the file:
 - `CLAUDE.md` → `AGENTS/`
 - `README.md` → `README/`
 - `Makefile` → `mk/`
+
+`api/openapi.json` is partly generated: `openapi-enrich` fills in types,
+formats and examples from `api/interactions.json` and writes them into
+the spec. What it writes is kept: a later run does not remove it, even
+once the interaction that caused it has changed. When an interaction
+contradicts your edit, it can also overwrite that edit.
+
+So change a type in both files, in the same commit. After `make ready`,
+read the diff of `api/openapi.json`. Put back any edit enrich reverted,
+and delete any example it inferred from an interaction that no longer
+exists.
 
 `.gitignore` is the exception: only the marked block at its head is
 generated. Your own rules go below that block, where they win — in a
