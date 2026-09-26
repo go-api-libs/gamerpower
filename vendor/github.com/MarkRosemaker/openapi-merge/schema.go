@@ -327,19 +327,23 @@ func mergeArrayItems(a, b *openapi.Schema) error {
 	}
 }
 
-// mergeItemsField merges a.Items with b.Items, defaulting either side that
-// is unset to the empty (matches-anything) schema first.
+// mergeItemsField merges a.Items with b.Items. Either side may be nil,
+// meaning that side never saw inside the array at all -- e.g. because it was
+// reconciled up from a value that was simply null in that sample -- in which
+// case the result adopts the other side's outright, rather than merging
+// against a fabricated placeholder that would otherwise claim to have
+// observed something (like a null element) that was never actually seen.
 func mergeItemsField(a, b *openapi.Schema) error {
-	// guard against nil pointer if a schema is invalid
-	if a.Items == nil {
-		a.Items = defaultSchemaRef()
+	switch {
+	case a.Items == nil:
+		a.Items = b.Items
+		return nil
+	case b.Items == nil:
+		b.Items = a.Items
+		return nil
+	default:
+		return Schema(a.Items.Value, b.Items.Value, false)
 	}
-
-	if b.Items == nil {
-		b.Items = defaultSchemaRef()
-	}
-
-	return Schema(a.Items.Value, b.Items.Value, false)
 }
 
 // mergeArrayShapeMismatch documents a and b -- both arrays whose shapes
@@ -441,14 +445,6 @@ func mismatchError(field string, err error, a, b *openapi.Schema) error {
 		Field: field,
 		Err:   fmt.Errorf("%w\na: %s\nb: %s", err, jsonString(a), jsonString(b)),
 	}
-}
-
-// defaultSchemaRef stands in for an array's missing Items: marked as
-// generated from null, the same as a property that was actually null in a
-// sample, so merging it against the other side's real Items type adopts
-// that type instead of clashing with this placeholder's own bare object.
-func defaultSchemaRef() *openapi.SchemaRef {
-	return &openapi.SchemaRef{Value: &openapi.Schema{Type: openapi.TypeObject, Example: jsontext.Value(null)}}
 }
 
 var null = jsontext.Null.String()
