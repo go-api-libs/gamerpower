@@ -443,8 +443,12 @@ func mismatchError(field string, err error, a, b *openapi.Schema) error {
 	}
 }
 
+// defaultSchemaRef stands in for an array's missing Items: marked as
+// generated from null, the same as a property that was actually null in a
+// sample, so merging it against the other side's real Items type adopts
+// that type instead of clashing with this placeholder's own bare object.
 func defaultSchemaRef() *openapi.SchemaRef {
-	return &openapi.SchemaRef{Value: &openapi.Schema{Type: openapi.TypeObject}}
+	return &openapi.SchemaRef{Value: &openapi.Schema{Type: openapi.TypeObject, Example: jsontext.Value(null)}}
 }
 
 var null = jsontext.Null.String()

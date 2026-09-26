@@ -368,6 +368,30 @@ func goNameOverride(s *openapi.Schema) string {
 	return ext.GoName
 }
 
+// enumNameOverrides returns the schema's x-enum-varnames or x-enumNames
+// extension (the two are aliases; x-enum-varnames wins if somehow both are
+// set), positionally matching s.Enum, or nil if neither is set.
+// See https://github.com/oapi-codegen/oapi-codegen/blob/main/docs/extensions.md#x-enum-varnames--x-enumnames.
+func enumNameOverrides(s *openapi.Schema) []string {
+	if len(s.Extensions) == 0 {
+		return nil
+	}
+
+	var ext struct {
+		VarNames []string `json:"x-enum-varnames"`
+		Names    []string `json:"x-enumNames"`
+	}
+	if err := json.Unmarshal(s.Extensions, &ext); err != nil {
+		return nil
+	}
+
+	if len(ext.VarNames) > 0 {
+		return ext.VarNames
+	}
+
+	return ext.Names
+}
+
 func fromAllOfSchema(name string, s *openapi.Schema) (*Schema, error) {
 	requiredSet := make(map[string]bool)
 	for _, r := range s.Required {
@@ -444,12 +468,8 @@ func getField(jsonName string, propRef *openapi.SchemaRef, requiredSet map[strin
 	ref := cmp.Or(propRef.Ref, &openapi.Reference{})
 
 	fieldName := fieldGoName(jsonName)
-	// only from an inline schema: a $ref'd component's own x-go-name renames
-	// that type, not every field that happens to reference it.
-	if propRef.Ref == nil {
-		if override := goNameOverride(v); override != "" {
-			fieldName = override
-		}
+	if override := goNameOverride(v); override != "" {
+		fieldName = override
 	}
 
 	return Field{
@@ -494,6 +514,8 @@ func fromEnumSchema(name string, s *openapi.Schema) (*Schema, error) {
 		return nil, err
 	}
 
+	nameOverrides := enumNameOverrides(s)
+
 	values := make([]EnumValue, len(s.Enum))
 	for i, v := range s.Enum {
 		display, literal, err := formatEnumValue(v, s.Type)
@@ -501,8 +523,13 @@ func fromEnumSchema(name string, s *openapi.Schema) (*Schema, error) {
 			return nil, fmt.Errorf("enum[%d]: %w", i, err)
 		}
 
+		goNameSource := display
+		if i < len(nameOverrides) && nameOverrides[i] != "" {
+			goNameSource = nameOverrides[i]
+		}
+
 		values[i] = EnumValue{
-			GoName:  enumConstName(name, display),
+			GoName:  enumConstName(name, goNameSource),
 			Value:   display,
 			Literal: literal,
 		}
@@ -606,12 +633,8 @@ func fromTupleSchema(name string, s *openapi.Schema) (*Schema, error) {
 		}
 
 		fieldName := fmt.Sprintf("Item%0*d", width, i)
-		// only from an inline schema, same as an object property: a $ref'd
-		// position's own x-go-name renames that type, not this position.
-		if p.Ref == nil {
-			if override := goNameOverride(p.Value); override != "" {
-				fieldName = override
-			}
+		if override := goNameOverride(p.Value); override != "" {
+			fieldName = override
 		}
 
 		ref := cmp.Or(p.Ref, &openapi.Reference{})
