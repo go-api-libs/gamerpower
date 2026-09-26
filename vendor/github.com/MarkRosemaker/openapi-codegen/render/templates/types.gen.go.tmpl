@@ -176,6 +176,9 @@ func (v *{{$typeName}}) MarshalJSONTo(enc *jsontext.Encoder) error {
 {{- $n := len .Fields}}
 type {{.Name}} struct {
 	{{- range .Fields}}
+	{{- if .Description}}
+	{{ toGoComment .Description }}
+	{{- end}}
 	{{.Name}} {{.Type}}
 	{{- end}}
 }

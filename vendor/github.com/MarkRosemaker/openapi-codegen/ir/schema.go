@@ -614,9 +614,12 @@ func fromTupleSchema(name string, s *openapi.Schema) (*Schema, error) {
 			}
 		}
 
+		ref := cmp.Or(p.Ref, &openapi.Reference{})
+
 		fields[i] = Field{
-			Name: fieldName,
-			Type: tp.String(),
+			Name:        fieldName,
+			Type:        tp.String(),
+			Description: cmp.Or(ref.Description, p.Value.Description),
 		}
 	}
 
