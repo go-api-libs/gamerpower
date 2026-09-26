@@ -121,6 +121,49 @@ func (pp parsedPath) fits(segments []string) bool {
 	return true
 }
 
+// literalCount returns the number of non-parameter segments in pp, used to
+// rank competing matches the way net/http's ServeMux prefers the pattern
+// with more fixed segments.
+func (pp parsedPath) literalCount() int {
+	n := 0
+	for _, el := range pp {
+		if !el.isParam {
+			n++
+		}
+	}
+
+	return n
+}
+
+// pathCandidate is a template that matches a request, scored so the best of
+// several candidates can be picked deterministically instead of depending on
+// map iteration order.
+type pathCandidate struct {
+	path    openapi.Path
+	pi      *openapi.PathItem
+	exact   bool // same segment count as the request; no greedy absorption needed
+	literal int
+}
+
+// better reports whether c should replace the current best candidate other.
+// An exact-length match always beats one reached only by a trailing greedy
+// param absorbing extra segments (see parsedPath.fits): that greedy
+// absorption exists for genuine multi-segment values like a package import
+// path, not to stand in for a same-length template that fits the request
+// precisely. Within the same tier, more literal segments wins, and ties are
+// broken by the path string for a deterministic result.
+func (c pathCandidate) better(other pathCandidate) bool {
+	if c.exact != other.exact {
+		return c.exact
+	}
+
+	if c.literal != other.literal {
+		return c.literal > other.literal
+	}
+
+	return c.path < other.path
+}
+
 // findPathItem finds an existing PathItem in doc.Paths that matches reqURL,
 // after stripping the server base URL. It returns the matched path key and PathItem.
 // If no match is found, it returns the relative path and nil.
@@ -136,13 +179,24 @@ func findPathItem(doc *openapi.Document, reqURL *url.URL) (openapi.Path, *openap
 		return openapi.Path(relPath), pi
 	}
 
-	// 2. Parametric match
+	// 2. Parametric match: score every fitting template and keep the best.
 	reqSegments := pathSegments(relPath)
+
+	var best *pathCandidate
 	for path, pi := range doc.Paths {
 		pp := parsePath(string(path))
-		if pp.fits(reqSegments) {
-			return path, pi
+		if !pp.fits(reqSegments) {
+			continue
 		}
+
+		c := pathCandidate{path: path, pi: pi, exact: len(pp) == len(reqSegments), literal: pp.literalCount()}
+		if best == nil || c.better(*best) {
+			best = &c
+		}
+	}
+
+	if best != nil {
+		return best.path, best.pi
 	}
 
 	// 3. No match

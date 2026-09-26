@@ -64,22 +64,37 @@ async function loadMocks() {
     return mocksPromise;
 }
 
+{{/* searchParamsMatch compares two URLSearchParams as multisets: same keys,
+     same values, same number of each, order and pairing irrelevant. */ -}}
+function searchParamsMatch(a, b) {
+    const sorted = (params) =>
+        [...params.entries()].sort(([k1, v1], [k2, v2]) =>
+            k1 === k2 ? v1.localeCompare(v2) : k1.localeCompare(k2),
+        );
+
+    const sa = sorted(a);
+    const sb = sorted(b);
+
+    return sa.length === sb.length &&
+        sa.every(([k, v], i) => k === sb[i][0] && v === sb[i][1]);
+}
+
 function matchesRequest(mockRequest, method, path) {
     if (!mockRequest) return false;
 
     const mockMethod = mockRequest.method?.toUpperCase();
-    const mockUrl = mockRequest.url;
-
     if (mockMethod && mockMethod !== method) return false;
 
-    if (mockUrl === path) return true;
-
+    let reqUrl, mockUrl;
     try {
-        const mockPath = new URL(mockUrl).pathname;
-        return mockPath === path || mockPath.endsWith(path);
+        reqUrl = new URL(API_BASE + path, window.location.href);
+        mockUrl = new URL(mockRequest.url, API_BASE || window.location.href);
     } catch {
-        return mockUrl.endsWith(path) || mockUrl === path;
+        return false;
     }
+
+    return reqUrl.pathname === mockUrl.pathname &&
+        searchParamsMatch(reqUrl.searchParams, mockUrl.searchParams);
 }
 {{- end }}
 

@@ -45,7 +45,7 @@ func matchInteractions(doc *ir.Document, interactions cassette.Interactions) err
 		call := ir.InteractionCall{Op: op}
 
 		for _, pp := range op.PathParams {
-			call.PathArgs = append(call.PathArgs, goLiteralForType(pp.Type, pathVals[pp.JSONName]))
+			call.PathArgs = append(call.PathArgs, goLiteralForType(pp, pathVals[pp.JSONName]))
 		}
 
 		q := u.Query()
@@ -54,7 +54,7 @@ func matchInteractions(doc *ir.Document, interactions cassette.Interactions) err
 			if val != "" {
 				call.QueryArgs = append(call.QueryArgs, ir.InteractionParam{
 					FieldName: qp.FieldName,
-					Literal:   goLiteralForType(qp.Type, val),
+					Literal:   goLiteralForType(qp, val),
 				})
 			}
 		}
@@ -64,7 +64,7 @@ func matchInteractions(doc *ir.Document, interactions cassette.Interactions) err
 			if val != "" {
 				call.HeaderArgs = append(call.HeaderArgs, ir.InteractionParam{
 					FieldName: hp.FieldName,
-					Literal:   goLiteralForType(hp.Type, val),
+					Literal:   goLiteralForType(hp, val),
 				})
 			}
 		}
@@ -255,16 +255,24 @@ func extractSegmentParam(tmpl, value string, out map[string]string) bool {
 	return true
 }
 
-// goLiteralForType returns a Go literal expression for value given the Go type.
-func goLiteralForType(goType, value string) string {
-	switch goType {
-	case "int", "int32", "int64", "uint", "uint32", "uint64", "bool":
+// goLiteralForType returns a Go literal expression for value given a path,
+// query, or header param, mirroring ir.Param.FormatExpr, which performs the
+// same conversion in the other direction when the client builds the request.
+func goLiteralForType(p ir.Param, value string) string {
+	switch p.Type {
+	case "int", "int32", "int64", "uint", "uint32", "uint64", "float32", "float64", "bool":
 		return value
 	case "uuid.UUID":
 		return fmt.Sprintf("uuid.MustParse(%q)", value)
-	default:
-		return fmt.Sprintf("%q", value)
+	case "time.Time":
+		// IsUnixTime: FormatExpr encoded the param as v.Unix(), so the
+		// recorded value is a Unix timestamp, not an RFC 3339 string.
+		if p.IsUnixTime {
+			return fmt.Sprintf("time.Unix(%s, 0)", value)
+		}
 	}
+
+	return fmt.Sprintf("%q", value)
 }
 
 // bodyLiteral returns a Go expression of type goType for the JSON value v (as
