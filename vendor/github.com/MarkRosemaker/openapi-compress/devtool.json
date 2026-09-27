@@ -1,0 +1,17 @@
+{
+	"description": "Remove redundancy from an OpenAPI specification in Go by merging component schemas that describe the same thing, rewriting every $ref that pointed at the copies, and shortening the resulting names.",
+	"topics": [
+		"api",
+		"api-tools",
+		"deduplication",
+		"go",
+		"json",
+		"json-schema",
+		"openapi",
+		"optimization",
+		"schema",
+		"swagger"
+	],
+	"coverage": 75.5,
+	"devtoolVersion": "v0.0.0-20260927001129-4f324c51339b"
+}
