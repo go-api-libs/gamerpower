@@ -1,0 +1,17 @@
+{
+	"description": "Merge two OpenAPI objects into one that covers both, reconciling schemas inferred from independent samples of real data. Handles partial evidence such as values observed only as null, integer and number widening, and dates encoded either as strings or as timestamps.",
+	"topics": [
+		"api",
+		"api-tools",
+		"go",
+		"json",
+		"json-schema",
+		"merge",
+		"openapi",
+		"schema",
+		"schema-inference",
+		"swagger"
+	],
+	"coverage": 77.7,
+	"devtoolVersion": "v0.0.0-20260927001129-4f324c51339b"
+}
