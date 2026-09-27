@@ -145,14 +145,18 @@ func findResponse(op *ir.Operation, statusCode int) *ir.Response {
 	return nil
 }
 
-// pickOperation returns the operation whose method and path template match the
-// URL, preferring an exact segment-count match over a trailing-wildcard match
-// so that e.g. /tasks/{taskId}/score/up wins over /tasks/{taskId} for a URL
-// like /tasks/abc/score/up.
+// pickOperation returns the operation whose method and path template best
+// match the URL. An exact segment-count match beats a trailing-wildcard one,
+// so /tasks/{taskId}/score/up wins over /tasks/{taskId} for
+// /tasks/abc/score/up; among matches of the same kind, more literal segments
+// win, as with net/http's ServeMux, so /things/running beats /things/{thingID}
+// for /things/running. The path template breaks any remaining tie.
 func pickOperation(ops []ir.Operation, method, relPath string) (*ir.Operation, map[string]string) {
 	var (
-		wildcardOp   *ir.Operation
-		wildcardVals map[string]string
+		bestOp      *ir.Operation
+		bestVals    map[string]string
+		bestExact   bool
+		bestLiteral int
 	)
 	for i := range ops {
 		op := &ops[i]
@@ -165,17 +169,38 @@ func pickOperation(ops []ir.Operation, method, relPath string) (*ir.Operation, m
 			continue
 		}
 
-		if exact {
-			return op, vals
+		literal := literalSegments(op.PathTemplate)
+
+		better := bestOp == nil
+		switch {
+		case better:
+		case exact != bestExact:
+			better = exact
+		case literal != bestLiteral:
+			better = literal > bestLiteral
+		default:
+			better = op.PathTemplate < bestOp.PathTemplate
 		}
 
-		if wildcardOp == nil {
-			wildcardOp = op
-			wildcardVals = vals
+		if better {
+			bestOp, bestVals, bestExact, bestLiteral = op, vals, exact, literal
 		}
 	}
 
-	return wildcardOp, wildcardVals
+	return bestOp, bestVals
+}
+
+// literalSegments counts the segments of a path template with no parameter in
+// them.
+func literalSegments(template string) int {
+	n := 0
+	for seg := range strings.SplitSeq(template, "/") {
+		if !strings.Contains(seg, "{") {
+			n++
+		}
+	}
+
+	return n
 }
 
 // matchPathTemplate matches a URL path against an operation path template,
