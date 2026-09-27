@@ -1,4 +1,5 @@
 {
 	"coverage": 100,
-	"devtoolVersion": "v0.0.0-20260925124641-de8a0adfdc4a"
+	"devtoolVersion": "v0.0.0-20260927105104-016049d867cb",
+	"kind": "apilib"
 }
