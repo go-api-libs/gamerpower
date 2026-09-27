@@ -11,7 +11,7 @@ tool (
 
 require (
 	github.com/MarkRosemaker/jsonutil v0.0.0-20260926134121-b012d46f1013
-	github.com/MarkRosemaker/openapi-enrich v0.0.0-20260926220311-57c5aa2d7816
+	github.com/MarkRosemaker/openapi-enrich v0.0.0-20260927000246-470fe65f0719
 	github.com/go-api-libs/api v0.0.0-20260926134121-babf8b5d639d
 )
 
@@ -20,7 +20,7 @@ require (
 	github.com/MarkRosemaker/errpath v0.0.0-20260926134119-30c5b0c3e2df // indirect
 	github.com/MarkRosemaker/json2yaml v0.0.0-20260926134120-afdbdef37e83 // indirect
 	github.com/MarkRosemaker/openapi v0.0.0-20260926134151-aa1dc08e01a8 // indirect
-	github.com/MarkRosemaker/openapi-codegen v0.0.0-20260926172922-6808f3f0385f // indirect
+	github.com/MarkRosemaker/openapi-codegen v0.0.0-20260926235137-bdf76ad63aa7 // indirect
 	github.com/MarkRosemaker/openapi-compare v0.0.0-20260926134224-66dea5399557 // indirect
 	github.com/MarkRosemaker/openapi-compress v0.0.0-20260926134527-b21b603e767b // indirect
 	github.com/MarkRosemaker/openapi-edit v0.0.0-20260926134224-db131bfe7927 // indirect

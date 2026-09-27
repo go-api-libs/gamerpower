@@ -1,6 +1,7 @@
 package ir
 
 import (
+	"cmp"
 	"fmt"
 	"net/url"
 	"slices"
@@ -201,6 +202,11 @@ func getGlobalParams(paths openapi.Paths, apiTitle string) (paramMap, error) {
 			if err != nil {
 				return nil, err
 			}
+
+			// A description on the $ref itself overrides the referenced
+			// component's own, per the Reference Object spec.
+			ref := cmp.Or(pRef.Ref, &openapi.Reference{})
+			param.Description = cmp.Or(ref.Description, param.Description)
 
 			if param.GlobalType != "" {
 				params.Set(p, param)

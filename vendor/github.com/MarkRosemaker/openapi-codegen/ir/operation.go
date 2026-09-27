@@ -1,6 +1,7 @@
 package ir
 
 import (
+	"cmp"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -46,6 +47,14 @@ func FromOperation(
 		if err != nil {
 			return nil, fmt.Errorf("param %q: %w", p.Name, err)
 		}
+
+		// A description on the $ref itself overrides the referenced
+		// component's own, per the Reference Object spec. Applied here
+		// rather than onto p.Description: p is the shared component value,
+		// so writing through it would leak this operation's override into
+		// every other reference to the same component.
+		ref := cmp.Or(pRef.Ref, &openapi.Reference{})
+		param.Description = cmp.Or(ref.Description, param.Description)
 
 		paramByName[p.Name] = param
 
@@ -487,10 +496,14 @@ func fromResponses(responses openapi.OperationResponses) (Responses, *GoType, bo
 			isRawBytes = true
 		}
 
+		// A description on the $ref itself overrides the referenced
+		// response's own, per the Reference Object spec.
+		respRef := cmp.Or(rRef.Ref, &openapi.Reference{})
+
 		result = append(result, Response{
 			StatusCode:  string(code),
 			GoConstant:  goConst,
-			Description: r.Description,
+			Description: cmp.Or(respRef.Description, r.Description),
 			ContentType: contentType,
 			GoType:      goType,
 			IsSuccess:   isSuccess,
