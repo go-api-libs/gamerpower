@@ -11,7 +11,7 @@ tool (
 
 require (
 	github.com/MarkRosemaker/jsonutil v0.0.0-20260927120110-8df582685e7f
-	github.com/MarkRosemaker/openapi-enrich v0.0.0-20260927120417-b3a7c2eb6cc0
+	github.com/MarkRosemaker/openapi-enrich v0.0.0-20260927220258-b65c59314843
 	github.com/go-api-libs/api v0.0.0-20260927120110-08e35820b2ab
 )
 
@@ -19,13 +19,13 @@ require (
 	cloud.google.com/go v0.123.0 // indirect
 	github.com/MarkRosemaker/errpath v0.0.0-20260927120109-a8204594eddb // indirect
 	github.com/MarkRosemaker/json2yaml v0.0.0-20260927120109-7dfc8e17a848 // indirect
-	github.com/MarkRosemaker/openapi v0.0.0-20260927120154-96a5958ab1ce // indirect
-	github.com/MarkRosemaker/openapi-codegen v0.0.0-20260927160336-4edd48539178 // indirect
-	github.com/MarkRosemaker/openapi-compare v0.0.0-20260927120234-5e282bd6d1cb // indirect
-	github.com/MarkRosemaker/openapi-compress v0.0.0-20260927120552-b6b607bf68e3 // indirect
-	github.com/MarkRosemaker/openapi-edit v0.0.0-20260927120234-a8757a565911 // indirect
-	github.com/MarkRosemaker/openapi-flatten v0.0.0-20260927120252-2f9c89886766 // indirect
-	github.com/MarkRosemaker/openapi-merge v0.0.0-20260927120234-60cd08bc03aa // indirect
+	github.com/MarkRosemaker/openapi v0.0.0-20260927193008-ea69551a5b80 // indirect
+	github.com/MarkRosemaker/openapi-codegen v0.0.0-20260927220743-e5e409cd34eb // indirect
+	github.com/MarkRosemaker/openapi-compare v0.0.0-20260927220137-685e9dc74a7f // indirect
+	github.com/MarkRosemaker/openapi-compress v0.0.0-20260927220448-d8d83e4374d2 // indirect
+	github.com/MarkRosemaker/openapi-edit v0.0.0-20260927220137-cccd5eeccb9b // indirect
+	github.com/MarkRosemaker/openapi-flatten v0.0.0-20260927220156-1a30b98bcdb4 // indirect
+	github.com/MarkRosemaker/openapi-merge v0.0.0-20260927220137-a539cb63369d // indirect
 	github.com/MarkRosemaker/ordmap v0.0.0-20260927120128-34682a8f96cc // indirect
 	github.com/MarkRosemaker/yaml v0.0.0-20260927120134-9e8a4e13e4ce // indirect
 	github.com/MarkRosemaker/yaml2json v0.0.0-20260927120109-f292881df1e4 // indirect
