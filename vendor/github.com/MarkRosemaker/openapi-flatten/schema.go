@@ -121,8 +121,8 @@ func schema(d *openapi.Document, s *openapi.Schema, name string) error {
 		return &errpath.ErrField{Field: "properties", Err: err}
 	}
 
-	if s.AdditionalProperties != nil {
-		if err := schemaRef(d, s.AdditionalProperties, name+"Value", moveIfNecessary); err != nil {
+	if ap := s.AdditionalProperties; ap != nil && ap.Schema != nil {
+		if err := schemaRef(d, ap.Schema, name+"Value", moveIfNecessary); err != nil {
 			return &errpath.ErrField{Field: "additionalProperties", Err: err}
 		}
 	}

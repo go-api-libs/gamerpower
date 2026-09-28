@@ -28,7 +28,7 @@ func Equal(a, b *openapi.Schema) bool {
 	return a.Title == b.Title &&
 		a.Description == b.Description &&
 		bytes.Equal(a.Default, b.Default) &&
-		sameCore(a, b, schemaRefEqual)
+		sameCore(a, b, schemaRefEqual, additionalPropertiesEqual)
 }
 
 // SameShape reports whether a and b validate identically: the same JSON
@@ -46,15 +46,21 @@ func SameShape(a, b *openapi.Schema) bool {
 		return false
 	}
 
-	return sameCore(a, b, schemaRefSameShape)
+	return sameCore(a, b, schemaRefSameShape, additionalPropertiesSameShape)
 }
 
 // sameCore compares the fields that determine what an instance validates
 // against, recursing into nested schemas through refMatch. refMatch decides
 // how strictly nested schemas are compared: schemaRefEqual for a full Equal
-// walk, schemaRefSameShape for a shape-only SameShape walk.
-func sameCore(a, b *openapi.Schema, refMatch func(a, b *openapi.SchemaRef) bool) bool {
+// walk, schemaRefSameShape for a shape-only SameShape walk. apMatch does the
+// same for additionalProperties.
+func sameCore(
+	a, b *openapi.Schema,
+	refMatch func(a, b *openapi.SchemaRef) bool,
+	apMatch func(a, b *openapi.AdditionalProperties) bool,
+) bool {
 	return a.Type == b.Type &&
+		a.Nullable == b.Nullable &&
 		a.Format == b.Format &&
 		schemaRefListsMatch(a.AllOf, b.AllOf, refMatch) &&
 		schemaRefListsMatch(a.OneOf, b.OneOf, refMatch) &&
@@ -65,12 +71,14 @@ func sameCore(a, b *openapi.Schema, refMatch func(a, b *openapi.SchemaRef) bool)
 		regexpsEqual(a.Pattern, b.Pattern) &&
 		slices.EqualFunc(a.Enum, b.Enum,
 			func(c, d jsontext.Value) bool { return bytes.Equal(c, d) }) &&
+		bytes.Equal(a.Const, b.Const) &&
 		a.MinItems == b.MinItems &&
 		ptrsEqual(a.MaxItems, b.MaxItems) &&
+		schemaRefListsMatch(a.PrefixItems, b.PrefixItems, refMatch) &&
 		refMatch(a.Items, b.Items) &&
 		schemaRefsMatch(a.Properties, b.Properties, refMatch) &&
 		slices.Equal(a.Required, b.Required) &&
-		refMatch(a.AdditionalProperties, b.AdditionalProperties) &&
+		apMatch(a.AdditionalProperties, b.AdditionalProperties) &&
 		a.ContentMediaType == b.ContentMediaType &&
 		a.ContentEncoding == b.ContentEncoding &&
 		bytes.Equal(a.Extensions, b.Extensions)
@@ -119,6 +127,45 @@ func schemaRefSameShape(a, b *openapi.SchemaRef) bool {
 		return SameShape(a.Value, b.Value)
 	default:
 		return false
+	}
+}
+
+// additionalPropertiesEqual reports whether a and b are written identically:
+// both absent, the same boolean, or fully identical schemas.
+func additionalPropertiesEqual(a, b *openapi.AdditionalProperties) bool {
+	return additionalPropertiesMatch(a, b, schemaRefEqual)
+}
+
+// additionalPropertiesSameShape reports whether a and b accept the same extra
+// properties. Absent, true and the empty schema all accept any.
+func additionalPropertiesSameShape(a, b *openapi.AdditionalProperties) bool {
+	if acceptsAny(a) && acceptsAny(b) {
+		return true
+	}
+
+	return additionalPropertiesMatch(a, b, schemaRefSameShape)
+}
+
+func additionalPropertiesMatch(a, b *openapi.AdditionalProperties, match func(a, b *openapi.SchemaRef) bool) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+
+	if a.Schema != nil || b.Schema != nil {
+		return match(a.Schema, b.Schema)
+	}
+
+	return a.Allowed == b.Allowed
+}
+
+func acceptsAny(ap *openapi.AdditionalProperties) bool {
+	switch {
+	case ap == nil:
+		return true
+	case ap.Schema == nil:
+		return ap.Allowed
+	default:
+		return ap.Schema.Ref == nil && SameShape(ap.Schema.Value, &openapi.Schema{})
 	}
 }
 
