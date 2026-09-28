@@ -199,7 +199,10 @@ func (w *schemaRefWalker) schema(s *openapi.Schema) {
 	w.schemaRefList(s.AnyOf)
 	w.schemaRef(s.Not)
 	w.schemaRef(s.Items)
-	w.schemaRef(s.AdditionalProperties)
+
+	if s.AdditionalProperties != nil {
+		w.schemaRef(s.AdditionalProperties.Schema)
+	}
 
 	for _, r := range s.Properties {
 		w.schemaRef(r)
