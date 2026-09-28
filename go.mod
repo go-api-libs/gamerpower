@@ -19,13 +19,13 @@ require (
 	cloud.google.com/go v0.123.0 // indirect
 	github.com/MarkRosemaker/errpath v0.0.0-20260927120109-a8204594eddb // indirect
 	github.com/MarkRosemaker/json2yaml v0.0.0-20260927120109-7dfc8e17a848 // indirect
-	github.com/MarkRosemaker/openapi v0.0.0-20260928153943-32502423c9cd // indirect
+	github.com/MarkRosemaker/openapi v0.0.0-20260928224039-ea37214c4e28 // indirect
 	github.com/MarkRosemaker/openapi-codegen v0.0.0-20260927220743-e5e409cd34eb // indirect
 	github.com/MarkRosemaker/openapi-compare v0.0.0-20260927220137-685e9dc74a7f // indirect
 	github.com/MarkRosemaker/openapi-compress v0.0.0-20260927220448-d8d83e4374d2 // indirect
-	github.com/MarkRosemaker/openapi-edit v0.0.0-20260928220206-91e1b720b50b // indirect
+	github.com/MarkRosemaker/openapi-edit v0.0.0-20260928224244-9536cef76049 // indirect
 	github.com/MarkRosemaker/openapi-flatten v0.0.0-20260927220156-1a30b98bcdb4 // indirect
-	github.com/MarkRosemaker/openapi-merge v0.0.0-20260928194924-246fd64a4e01 // indirect
+	github.com/MarkRosemaker/openapi-merge v0.0.0-20260928224244-b9205f78685d // indirect
 	github.com/MarkRosemaker/ordmap v0.0.0-20260927120128-34682a8f96cc // indirect
 	github.com/MarkRosemaker/yaml v0.0.0-20260927120134-9e8a4e13e4ce // indirect
 	github.com/MarkRosemaker/yaml2json v0.0.0-20260927120109-f292881df1e4 // indirect
