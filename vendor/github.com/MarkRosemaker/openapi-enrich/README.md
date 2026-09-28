@@ -53,6 +53,9 @@ What it infers:
   repeated observations are merged.
 - **Schema formats** — UUID, URI, email, date-time, IPv4, IPv6 are detected
   automatically from string values.
+- **Schema types** — a schema in the given document that has no `type` gets
+  the one its `enum` or `const` values share, e.g. `{"const": 401}` becomes
+  an `integer`; a `null` among them makes it nullable.
 
 The module also ships the pieces needed to *obtain* that traffic:
 
@@ -141,6 +144,7 @@ client.
 ## Additional Information
 
 - [**Go Reference**](https://pkg.go.dev/github.com/MarkRosemaker/openapi-enrich): API documentation.
+- [**Roadmap**](docs/roadmap.md): what is planned and not yet done.
 
 ## Contributing
 

@@ -139,7 +139,7 @@ func decodeObjectSchema(dec *jsontext.Decoder) (*openapi.Schema, error) {
 
 		return &openapi.Schema{
 			Type:                 openapi.TypeObject,
-			AdditionalProperties: &openapi.SchemaRef{Value: valueSchema},
+			AdditionalProperties: &openapi.AdditionalProperties{Schema: &openapi.SchemaRef{Value: valueSchema}},
 		}, nil
 	}
 

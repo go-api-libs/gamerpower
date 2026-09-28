@@ -13,7 +13,7 @@ import "github.com/MarkRosemaker/openapi"
 // infinite recursion on a self-referential schema.
 //
 // This is the traversal RenameSchema uses to find every occurrence of a
-// reference; it's exported because other structural edits need the same
+// reference; it's shared because other structural edits need the same
 // walk with a different fn, e.g. finding every reference to a schema that's
 // about to be redirected onto another with [RedirectSchema].
 func walkSchemaRefs(doc *openapi.Document, fn func(*openapi.SchemaRef)) {
@@ -198,6 +198,7 @@ func (w *schemaRefWalker) schema(s *openapi.Schema) {
 	w.schemaRefList(s.OneOf)
 	w.schemaRefList(s.AnyOf)
 	w.schemaRef(s.Not)
+	w.schemaRefList(s.PrefixItems)
 	w.schemaRef(s.Items)
 
 	if s.AdditionalProperties != nil {

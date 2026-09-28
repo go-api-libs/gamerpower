@@ -62,13 +62,13 @@ func growEnumsValue(s *openapi.Schema, v any) error {
 			}
 		}
 
-		if s.AdditionalProperties != nil {
+		if ap := s.AdditionalProperties; ap != nil && ap.Schema != nil {
 			for key, val := range obj {
 				if cassette.RedactsBodyKey(key) {
 					continue
 				}
 
-				if err := growEnumsValue(s.AdditionalProperties.Value, val); err != nil {
+				if err := growEnumsValue(ap.Schema.Value, val); err != nil {
 					return &errpath.ErrField{Field: "additionalProperties", Err: &errpath.ErrKey{Key: key, Err: err}}
 				}
 			}

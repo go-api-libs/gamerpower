@@ -371,21 +371,23 @@ func mergeArrayShapeMismatch(a, b *openapi.Schema) {
 // mergeObjectProperties merges b's properties into a's, either directly or,
 // when a is a string map, into its additionalProperties schema.
 func mergeObjectProperties(a, b *openapi.Schema) error {
-	if a.AdditionalProperties != nil {
+	if ap := a.AdditionalProperties; ap != nil && ap.Schema != nil {
 		// is a string map
-		if b.AdditionalProperties != nil {
-			if err := Schema(a.AdditionalProperties.Value, b.AdditionalProperties.Value, false); err != nil {
+		if bp := b.AdditionalProperties; bp != nil && bp.Schema != nil {
+			if err := Schema(ap.Schema.Value, bp.Schema.Value, false); err != nil {
 				return &errpath.ErrField{Field: "additionalProperties", Err: err}
 			}
 		}
 
 		// merge all property values with prop
 		for _, prop := range b.Properties {
-			if err := Schema(a.AdditionalProperties.Value, prop.Value, false); err != nil {
+			if err := Schema(ap.Schema.Value, prop.Value, false); err != nil {
 				return &errpath.ErrField{Field: "additionalProperties", Err: err}
 			}
 		}
 	} else {
+		a.AdditionalProperties = mergeAdditionalProperties(a.AdditionalProperties, b.AdditionalProperties)
+
 		// Ensure a.Properties is initialized so schemaRefs can append to it
 		// when a has no properties yet but b does.
 		if a.Properties == nil && len(b.Properties) > 0 {
@@ -426,6 +428,20 @@ func mergeObjectProperties(a, b *openapi.Schema) error {
 	}
 
 	return nil
+}
+
+// mergeAdditionalProperties merges a non-schema a with b: absent says nothing, a schema beats a boolean, and true beats false.
+func mergeAdditionalProperties(a, b *openapi.AdditionalProperties) *openapi.AdditionalProperties {
+	switch {
+	case a == nil:
+		return b
+	case b == nil:
+		return a
+	case b.Schema != nil:
+		return b
+	default:
+		return &openapi.AdditionalProperties{Allowed: a.Allowed || b.Allowed}
+	}
 }
 
 // jsonString marshals s for a debug message or a shape comparison against
