@@ -73,6 +73,7 @@ func sameCore(
 		ptrsEqual(a.Max, b.Max) &&
 		ptrsEqual(a.ExclusiveMin, b.ExclusiveMin) &&
 		ptrsEqual(a.ExclusiveMax, b.ExclusiveMax) &&
+		ptrsEqual(a.MultipleOf, b.MultipleOf) &&
 		a.MinLength == b.MinLength &&
 		ptrsEqual(a.MaxLength, b.MaxLength) &&
 		regexpsEqual(a.Pattern, b.Pattern) &&
@@ -87,6 +88,7 @@ func sameCore(
 		schemasMatch(a.Properties, b.Properties, match) &&
 		slices.Equal(a.Required, b.Required) &&
 		apMatch(a.AdditionalProperties, b.AdditionalProperties) &&
+		match(a.PropertyNames, b.PropertyNames) &&
 		ptrsEqual(a.MaxProperties, b.MaxProperties) &&
 		discriminatorsEqual(a.Discriminator, b.Discriminator) &&
 		a.ContentMediaType == b.ContentMediaType &&
@@ -108,7 +110,25 @@ func discriminatorsEqual(a, b *openapi.Discriminator) bool {
 		return a == b
 	}
 
-	return a.PropertyName == b.PropertyName && bytes.Equal(a.Extensions, b.Extensions)
+	return a.PropertyName == b.PropertyName &&
+		mappingsEqual(a.Mapping, b.Mapping) &&
+		bytes.Equal(a.Extensions, b.Extensions)
+}
+
+// mappingsEqual reports whether a and b map the same values to the same schemas, whether a schema is named or referenced.
+func mappingsEqual(a, b openapi.MapOfStrings) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for key, av := range a {
+		bv, ok := b[key]
+		if !ok || openapi.MappingRef(av.Value) != openapi.MappingRef(bv.Value) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // additionalPropertiesEqual reports whether a and b are written identically:

@@ -60,6 +60,9 @@ What it infers:
 - **Schema types** — a schema in the given document that has no `type` gets
   the one its `enum` or `const` values share, e.g. `{"const": 401}` becomes
   an `integer`; a `null` among them makes it nullable.
+- **Enums** — an `enum` already declared in the given document grows with
+  every value observed for it. An object's keys count too, when its
+  `propertyNames` declares an enum. A recording never starts an enum of its own.
 
 The module also ships the pieces needed to *obtain* that traffic:
 

@@ -74,6 +74,15 @@ func growEnumsValue(s *openapi.Schema, v any) error {
 			}
 		}
 
+		// masking hides a value, never its key, so every key observed is a real one
+		if s.PropertyNames != nil {
+			for key := range obj {
+				if err := growEnumsValue(deref(s.PropertyNames), key); err != nil {
+					return &errpath.ErrField{Field: "propertyNames", Err: &errpath.ErrKey{Key: key, Err: err}}
+				}
+			}
+		}
+
 	case openapi.TypeArray:
 		arr, ok := v.([]any)
 		if !ok || s.Items == nil {
