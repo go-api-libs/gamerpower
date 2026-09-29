@@ -66,7 +66,6 @@ stop.
 Edit the directory, never the file:
 
 - `AGENTS.md` → `AGENTS/`
-- `CLAUDE.md` → `AGENTS/`
 - `README.md` → `README/`
 - `Makefile` → `mk/`
 
@@ -113,4 +112,5 @@ generated. Your own rules go below that block, where they win — in a
 
 Open one when the work touches it.
 
+- [The openapi family](AGENTS/family.md)
 - [Golden files in testdata](AGENTS/golden-files.md)

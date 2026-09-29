@@ -29,6 +29,14 @@ ago. What they do have is traffic. This module treats that traffic as the source
 truth: record some real calls, and get a document describing what the API actually
 does.
 
+That document is also the first step towards a client library. It feeds
+[`openapi-flatten`](https://github.com/MarkRosemaker/openapi-flatten),
+[`openapi-compress`](https://github.com/MarkRosemaker/openapi-compress) and
+[`openapi-codegen`](https://github.com/MarkRosemaker/openapi-codegen), so an API
+that was never properly documented gets both a specification and a Go library to
+call it with. Where the library fails to decode a response, recording that call
+and enriching again closes the gap.
+
 Enrichment is incremental by design. Every additional interaction refines the
 result rather than replacing it — a second observation of the same endpoint
 contributes any fields the first one didn't include, and widens a type where the two
@@ -63,6 +71,10 @@ What it infers:
 - **Enums** — an `enum` already declared in the given document grows with
   every value observed for it. An object's keys count too, when its
   `propertyNames` declares an enum. A recording never starts an enum of its own.
+- **Shared components** — a schema several operations refer to is documented
+  from whichever of them was recorded, since sharing says they have the same
+  shape. Recording the others widens it to fit all of them. Where the sharing
+  itself is wrong, give each operation its own schema in the input.
 
 The module also ships the pieces needed to *obtain* that traffic:
 
@@ -151,7 +163,6 @@ client.
 ## Additional Information
 
 - [**Go Reference**](https://pkg.go.dev/github.com/MarkRosemaker/openapi-enrich): API documentation.
-- [**Roadmap**](docs/roadmap.md): what is planned and not yet done.
 
 ## Contributing
 

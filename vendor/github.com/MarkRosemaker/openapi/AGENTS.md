@@ -66,7 +66,6 @@ stop.
 Edit the directory, never the file:
 
 - `AGENTS.md` → `AGENTS/`
-- `CLAUDE.md` → `AGENTS/`
 - `README.md` → `README/`
 - `Makefile` → `mk/`
 
@@ -113,6 +112,7 @@ generated. Your own rules go below that block, where they win — in a
 
 Open one when the work touches it.
 
+- [The openapi family](AGENTS/family.md)
 - [GitHub without the gh CLI](AGENTS/github.md)
 - [JSON first, YAML only on request](AGENTS/json-first.md)
 - [Justify changes by the specification](AGENTS/specification.md)

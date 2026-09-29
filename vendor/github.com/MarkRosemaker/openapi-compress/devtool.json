@@ -13,6 +13,6 @@
 		"swagger"
 	],
 	"coverage": 76.7,
-	"devtoolVersion": "v0.0.0-20260929040238-e18b4b00b706",
+	"devtoolVersion": "v0.0.0-20260929224604-10283fdc823e",
 	"kind": "cli"
 }
