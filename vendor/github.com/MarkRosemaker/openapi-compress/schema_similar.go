@@ -48,7 +48,7 @@ func schemasSimilarity(a, b *openapi.Schema) float64 {
 		refB, okB := b.Properties[name]
 		if okA && okB {
 			switch {
-			case schemaRefSameShape(refA, refB):
+			case schema.SameShape(refA, refB):
 				score += 1.0
 			case !reconcilable(refA, refB):
 				// No widening covers both, so no amount of agreement
@@ -64,32 +64,6 @@ func schemasSimilarity(a, b *openapi.Schema) float64 {
 	return score / float64(len(union))
 }
 
-// schemaRefSameShape reports whether a and b are the same schema, ignoring
-// documentation-only differences (see schema.SameShape). It dispatches
-// between a $ref (compared by identifier) and an inline schema (compared by
-// shape): openapi-compare/schema only compares *openapi.Schema values, not
-// SchemaRef wrappers, so this small amount of ref-vs-value dispatch logic
-// stays local rather than being extracted - this package is currently the
-// only consumer that needs it.
-func schemaRefSameShape(a, b *openapi.SchemaRef) bool {
-	if a == b {
-		return true
-	}
-
-	if a == nil || b == nil {
-		return false
-	}
-
-	switch {
-	case a.Ref != nil && b.Ref != nil:
-		return a.Ref.Identifier == b.Ref.Identifier
-	case a.Ref == nil && b.Ref == nil:
-		return schema.SameShape(a.Value, b.Value)
-	default:
-		return false
-	}
-}
-
 // mergeSchemas merges schema b into schema a (modifying a in-place).
 // After the call a is a superset of both: it has the union of properties
 // (with properties that only exist in b added as optional) and the intersection
@@ -99,13 +73,13 @@ func mergeSchemas(a, b *openapi.Schema) {
 	// Merge properties.
 	for name, refB := range b.Properties {
 		if refA, ok := a.Properties[name]; ok {
-			if !schemaRefSameShape(refA, refB) {
-				a.Properties[name] = reconcileSchemaRef(refA, refB)
+			if !schema.SameShape(refA, refB) {
+				a.Properties[name] = reconcileProperty(refA, refB)
 			}
 		} else {
 			// Property only in b — add it to a as optional.
 			if a.Properties == nil {
-				a.Properties = make(openapi.SchemaRefs)
+				a.Properties = openapi.Schemas{}
 			}
 
 			a.Properties.Set(name, refB)
@@ -128,25 +102,17 @@ func mergeSchemas(a, b *openapi.Schema) {
 	a.Required = kept
 }
 
-// reconcileSchemaRef returns the more general of two SchemaRefs.
-// Only inline (non-$ref) schemas are reconciled; if either side uses a $ref,
-// a's ref is kept as-is.
-func reconcileSchemaRef(a, b *openapi.SchemaRef) *openapi.SchemaRef {
+// reconcileProperty returns the more general of two property schemas.
+// Only inline schemas are reconciled; if either side is a $ref, a is kept as-is.
+func reconcileProperty(a, b *openapi.Schema) *openapi.Schema {
 	if a.Ref != nil || b.Ref != nil {
 		return a
 	}
 
-	if a.Value == nil || b.Value == nil {
-		return a
-	}
-
-	merged := *a // shallow copy of the SchemaRef wrapper
-	merged.Value = reconcileInlineSchemas(a.Value, b.Value)
-
-	return &merged
+	return reconcileInlineSchemas(a, b)
 }
 
-// reconcileInlineSchemas returns a copy of a widened to also accept b's values.
+// reconcileInlineSchemas returns a copy of a widened to also accept b's values; being a copy, it keeps a's place among the properties.
 // Currently handles integer + number → number.
 func reconcileInlineSchemas(a, b *openapi.Schema) *openapi.Schema {
 	result := *a // shallow copy
@@ -164,7 +130,7 @@ func reconcileInlineSchemas(a, b *openapi.Schema) *openapi.Schema {
 // reconcilable reports whether merging would produce a property that still
 // describes both sides.
 //
-// It almost never does. reconcileSchemaRef keeps a's reference and drops b's,
+// It almost never does. reconcileProperty keeps a's reference and drops b's,
 // and for two inline schemas reconcileInlineSchemas widens integer to number
 // and otherwise returns a copy of a. So unless that one widening applies, the
 // merged schema quietly claims a shape b's data does not have -- and nothing
@@ -172,27 +138,27 @@ func reconcileInlineSchemas(a, b *openapi.Schema) *openapi.Schema {
 //
 // Properties present on only one side are a different matter: mergeSchemas
 // carries those across as optional, which does describe both.
-func reconcilable(a, b *openapi.SchemaRef) bool {
-	if a == nil || b == nil || a.Value == nil || b.Value == nil {
+func reconcilable(a, b *openapi.Schema) bool {
+	if a == nil || b == nil {
 		return true // nothing to judge it on
 	}
 
 	if a.Ref != nil || b.Ref != nil {
-		// The references disagree -- schemaRefSameShape has already said so --
+		// The references disagree -- schema.SameShape has already said so --
 		// and merging keeps a's. If the schemas they point at are themselves
 		// mergeable, an earlier or later pass merges them and the references
 		// become equal, at which point this pair scores full credit instead.
 		return false
 	}
 
-	ta, tb := a.Value.Type, b.Value.Type
+	ta, tb := a.Type, b.Type
 
 	return (ta == openapi.TypeInteger && tb == openapi.TypeNumber) ||
 		(ta == openapi.TypeNumber && tb == openapi.TypeInteger)
 }
 
-// propertyNameUnion returns the union of property names from two SchemaRefs maps.
-func propertyNameUnion(a, b openapi.SchemaRefs) []string {
+// propertyNameUnion returns the union of property names from two property maps.
+func propertyNameUnion(a, b openapi.Schemas) []string {
 	seen := make(map[string]struct{}, len(a)+len(b))
 	names := make([]string, 0, len(a)+len(b))
 	for name := range a {
@@ -210,4 +176,36 @@ func propertyNameUnion(a, b openapi.SchemaRefs) []string {
 	}
 
 	return names
+}
+
+// fillExamples gives a, and the schemas within it, the examples b has where a has none, so merging b away loses none of them.
+// A reference is not followed: the schema it points to keeps its own examples.
+func fillExamples(a, b *openapi.Schema) {
+	if a == nil || b == nil || a.Ref != nil || b.Ref != nil {
+		return
+	}
+
+	if a.Example == nil {
+		a.Example = b.Example
+	}
+
+	if len(a.Examples) == 0 {
+		a.Examples = b.Examples
+	}
+
+	for name, p := range a.Properties {
+		fillExamples(p, b.Properties[name])
+	}
+
+	fillExamples(a.Items, b.Items)
+
+	for i, p := range a.PrefixItems {
+		if i < len(b.PrefixItems) {
+			fillExamples(p, b.PrefixItems[i])
+		}
+	}
+
+	if a.AdditionalProperties != nil && b.AdditionalProperties != nil {
+		fillExamples(a.AdditionalProperties.Schema, b.AdditionalProperties.Schema)
+	}
 }
