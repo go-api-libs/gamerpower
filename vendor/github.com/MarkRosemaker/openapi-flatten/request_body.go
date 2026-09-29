@@ -3,10 +3,11 @@ package flatten
 import (
 	"github.com/MarkRosemaker/errpath"
 	"github.com/MarkRosemaker/openapi"
+	"github.com/ettle/strcase"
 )
 
 func nameRequestBody(opID string) string {
-	return opID + "RequestBody"
+	return strcase.ToGoPascal(opID)
 }
 
 func requestBody(d *openapi.Document, r *openapi.RequestBody, reqBodyName string) error {

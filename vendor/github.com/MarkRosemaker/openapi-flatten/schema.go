@@ -5,6 +5,7 @@ import (
 
 	"github.com/MarkRosemaker/errpath"
 	"github.com/MarkRosemaker/openapi"
+	"github.com/ettle/strcase"
 )
 
 type mode int
@@ -95,11 +96,12 @@ func schema(d *openapi.Document, s *openapi.Schema, name string) error {
 		return &errpath.ErrField{Field: "allOf", Err: err}
 	}
 
-	if err := inlineSchemaList(d, s.OneOf, name+"OneOf", neverMove); err != nil {
+	// a branch with a shape of its own is named like any other; allOf's stay inline, as they merge into s
+	if err := inlineBranches(d, s.OneOf, name+"OneOf"); err != nil {
 		return &errpath.ErrField{Field: "oneOf", Err: err}
 	}
 
-	if err := inlineSchemaList(d, s.AnyOf, name+"AnyOf", neverMove); err != nil {
+	if err := inlineBranches(d, s.AnyOf, name+"AnyOf"); err != nil {
 		return &errpath.ErrField{Field: "anyOf", Err: err}
 	}
 
@@ -125,6 +127,18 @@ func schema(d *openapi.Document, s *openapi.Schema, name string) error {
 		}
 	}
 
+	if s.PropertyNames != nil {
+		if err := inlineSchema(d, s.PropertyNames, name+"Key", moveIfNecessary); err != nil {
+			return &errpath.ErrField{Field: "propertyNames", Err: err}
+		}
+	}
+
+	if s.Not != nil {
+		if err := inlineSchema(d, s.Not, name+"Not", moveIfNecessary); err != nil {
+			return &errpath.ErrField{Field: "not", Err: err}
+		}
+	}
+
 	return nil
 }
 
@@ -136,6 +150,22 @@ func moveSchemaToComponents(d *openapi.Document, name string, s *openapi.Schema)
 	s.Replace(&openapi.Schema{Ref: &openapi.SchemaRef{Identifier: newRef("schemas", name).Identifier, Value: &moved}})
 
 	return &moved
+}
+
+// inlineBranches flattens the alternatives of a oneOf or anyOf, naming each by its title, or else by prefix and position.
+func inlineBranches(d *openapi.Document, ss openapi.SchemaList, prefix string) error {
+	for i, s := range ss {
+		name := fmt.Sprintf("%s%d", prefix, i)
+		if s.Title != "" {
+			name = strcase.ToGoPascal(s.Title)
+		}
+
+		if err := inlineSchema(d, s, name, moveIfNecessary); err != nil {
+			return &errpath.ErrIndex{Index: i, Err: err}
+		}
+	}
+
+	return nil
 }
 
 func inlineSchemaList(d *openapi.Document, ss openapi.SchemaList, prefix string, mode mode) error {

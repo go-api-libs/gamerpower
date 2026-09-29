@@ -88,7 +88,7 @@ Inline schemas are moved to `components/schemas` when they contain meaningful st
 - a **string** or **array of strings** with `enum` values
 - an **array of objects**
 
-Schemas inside `allOf` are never moved because they exist solely to compose a larger type.
+The alternatives of a `oneOf` or `anyOf` are moved by the same rules, so each shaped alternative gets a name of its own, and so are the schema of an object's keys (`propertyNames`) and the schema a value must not match (`not`). Schemas inside `allOf` are never moved because they exist solely to compose a larger type.
 
 **Before:**
 
@@ -195,6 +195,8 @@ repeating themselves.
 ## Name generation
 
 All names are converted to Go-style PascalCase (e.g., `create pet bad request response` → `CreatePetBadRequestResponse`). If the generated name is already taken, a numeric suffix is appended (`Name2`, `Name3`, …) to avoid collisions.
+
+A `oneOf` or `anyOf` alternative is named by its `title` if it has one (`"A person"` → `APerson`), and otherwise by its parent, the keyword and its position (`PetOneOf1`). The schema of an object's keys is named after the object plus `Key` (`PetKey`), and a `not` schema plus `Not` (`PetNot`).
 
 ## Error reporting
 

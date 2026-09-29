@@ -15,7 +15,7 @@ func nameResponse(opID string, code openapi.StatusCode) string {
 		statusText = string(code)
 	}
 
-	return strcase.ToGoPascal(strings.Join([]string{opID, statusText, "Response"}, " "))
+	return strcase.ToGoPascal(strings.Join([]string{opID, statusText}, " "))
 }
 
 func response(d *openapi.Document, r *openapi.Response, rspName string, modeSchema mode) error {

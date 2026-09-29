@@ -87,6 +87,7 @@ func RenameSchema(doc *openapi.Document, oldName, newName string) error {
 	schemas[newName] = s
 
 	renameRefs(doc, schemaRefPrefix+oldName, schemaRefPrefix+newName)
+	rewriteMappings(doc, oldName, newName)
 
 	return nil
 }
@@ -96,6 +97,30 @@ func renameRefs(doc *openapi.Document, old, new string) {
 	walkSchemas(doc, func(s *openapi.Schema) {
 		if s.Ref != nil && s.Ref.Identifier == old {
 			s.Ref.Identifier = new
+		}
+	})
+}
+
+// rewriteMappings points every discriminator mapping value that stands for oldName at newName, keeping the value's form: a name or a reference.
+func rewriteMappings(doc *openapi.Document, oldName, newName string) {
+	walkSchemas(doc, func(s *openapi.Schema) {
+		if s.Discriminator == nil {
+			return
+		}
+
+		for key, v := range s.Discriminator.Mapping {
+			if openapi.MappingRef(v.Value) != schemaRefPrefix+oldName {
+				continue
+			}
+
+			if v.Value == oldName {
+				v.Value = newName
+			} else {
+				v.Value = schemaRefPrefix + newName
+			}
+
+			// a copy of the entry keeps its place in the mapping
+			s.Discriminator.Mapping[key] = v
 		}
 	})
 }

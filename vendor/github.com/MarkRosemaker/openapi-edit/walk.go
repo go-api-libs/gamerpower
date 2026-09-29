@@ -201,6 +201,8 @@ func (w *schemaWalker) schema(s *openapi.Schema) {
 		w.schema(s.AdditionalProperties.Schema)
 	}
 
+	w.schema(s.PropertyNames)
+
 	for _, p := range s.Properties {
 		w.schema(p)
 	}
