@@ -24,11 +24,11 @@ func Parameter(a, b *openapi.Parameter) error {
 	// A parameter MUST contain either a `schema` property, or a `content` property, but not both.
 	if b.Schema != nil {
 		if a.Schema != nil {
-			if err := Schema(a.Schema.Value, b.Schema.Value, true); err != nil {
+			if err := Schema(deref(a.Schema), deref(b.Schema), true); err != nil {
 				return &errpath.ErrField{Field: "schema", Err: err}
 			}
 
-			if a.Schema.Value.Type == openapi.TypeArray {
+			if deref(a.Schema).Type == openapi.TypeArray {
 				// TODO: only delete if example is no longer an array
 				a.Example = nil
 				b.Example = nil

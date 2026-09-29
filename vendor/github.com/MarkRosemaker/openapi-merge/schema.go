@@ -29,7 +29,12 @@ func Schema(a, b *openapi.Schema, isParam bool) error {
 		return err
 	}
 
-	tp = reconcileGeneratedFromNull(a, b, tp)
+	if b.Type == openapi.TypeNull {
+		mergeNull(a)
+		return nil
+	}
+
+	tp = reconcileNull(a, b, tp)
 	improveExample(a, b)
 
 	if tp != b.Type {
@@ -76,7 +81,7 @@ func mergeIfOneOf(a, b *openapi.Schema) (handled bool, err error) {
 			return true, err
 		}
 
-		*a = *b
+		a.Replace(b)
 
 		return true, nil
 	}
@@ -97,14 +102,14 @@ func effectiveType(a *openapi.Schema) (openapi.DataType, error) {
 		return "", fmt.Errorf("type %q with allOf not implemented yet", tp)
 	}
 
-	tp = a.AllOf[0].Value.Type
+	tp = deref(a.AllOf[0]).Type
 
 	if tp != openapi.TypeObject {
 		return "", fmt.Errorf("allOf with type %q not implemented yet", tp)
 	}
 
-	idx := slices.IndexFunc(a.AllOf[1:], func(s *openapi.SchemaRef) bool {
-		return s.Value.Type != tp
+	idx := slices.IndexFunc(a.AllOf[1:], func(s *openapi.Schema) bool {
+		return deref(s).Type != tp
 	})
 	if idx != -1 {
 		return "", &errpath.ErrField{
@@ -114,7 +119,7 @@ func effectiveType(a *openapi.Schema) (openapi.DataType, error) {
 				Err: &errpath.ErrField{
 					Field: "type",
 					Err: fmt.Errorf("%q != %q",
-						a.AllOf[idx+1].Value.Type, tp),
+						deref(a.AllOf[idx+1]).Type, tp),
 				},
 			},
 		}
@@ -123,25 +128,24 @@ func effectiveType(a *openapi.Schema) (openapi.DataType, error) {
 	return tp, nil
 }
 
-// reconcileGeneratedFromNull sets the type and format of whichever of a, b
-// was generated from a null value (meaning we had no real information about
-// its type) from the other, and returns the effective type to merge as: tp
-// unchanged when neither was, b.Type when a was.
-func reconcileGeneratedFromNull(a, b *openapi.Schema, tp openapi.DataType) openapi.DataType {
-	switch {
-	case isGeneratedFromNull(b):
-		b.Type = tp
-		b.Format = a.Format
-		// TODO: a.Nullable = true
-	case isGeneratedFromNull(a):
-		tp = b.Type
-		a.Type = tp
-		a.Format = b.Format
-
-		if tp != openapi.TypeObject {
-			a.Properties = nil
-		}
+// mergeNull merges a value seen as null into a: a typed schema becomes nullable, and an untyped one, which already allows null, is left alone.
+func mergeNull(a *openapi.Schema) {
+	if a.Type != "" && a.Type != openapi.TypeNull {
+		a.Nullable = true
 	}
+}
+
+// reconcileNull makes a, if it was only seen as null, take b's type and allow null too, and carries over b's nullability.
+// It returns the type to merge as.
+func reconcileNull(a, b *openapi.Schema, tp openapi.DataType) openapi.DataType {
+	if a.Type == openapi.TypeNull && b.Type != "" {
+		tp = b.Type
+		a.Type, a.Format, a.Nullable = tp, b.Format, true
+		// a has no bounds of its own to widen b's with
+		a.MinItems, a.MaxItems = b.MinItems, b.MaxItems
+	}
+
+	a.Nullable = a.Nullable || b.Nullable
 
 	return tp
 }
@@ -177,16 +181,16 @@ func reconcileTypeMismatch(a, b *openapi.Schema, tp openapi.DataType, isParam bo
 		return false, nil
 	case tp == openapi.TypeNumber && b.Type == openapi.TypeString && isInfinityExample(bJSON),
 		b.Type == openapi.TypeNumber && tp == openapi.TypeString && isZeroDoubleExample(bJSON):
-		*b = *a
+		b.Replace(a)
 		return true, nil
 	case b.Type == openapi.TypeNumber && tp == openapi.TypeString && isInfinityExample(aJSON):
-		*a = *b
+		a.Replace(b)
 		return true, nil
 	case a.Type == openapi.TypeNumber && b.Type == openapi.TypeInteger:
-		*b = *a
+		b.Replace(a)
 		return true, nil
 	case a.Type == openapi.TypeInteger && b.Type == openapi.TypeNumber:
-		*a = *b
+		a.Replace(b)
 		return true, nil
 	case isDateTimeString(a) && b.Type == openapi.TypeInteger,
 		isDateTimeString(b) && a.Type == openapi.TypeInteger:
@@ -196,7 +200,7 @@ func reconcileTypeMismatch(a, b *openapi.Schema, tp openapi.DataType, isParam bo
 		mergeDateTimeOrTimestamp(a, b)
 		return true, nil
 	case a.Type == openapi.TypeInteger && b.Type == openapi.TypeString:
-		*b = *a
+		b.Replace(a)
 		return true, nil
 	default:
 		return true, mismatchError("type", fmt.Errorf("%q != %q", tp, b.Type), a, b)
@@ -304,12 +308,14 @@ func mergeByType(a, b *openapi.Schema, tp openapi.DataType) error {
 // all -- positions can't line up, so the result keeps both shapes as
 // alternatives instead of forcing a lossy merge between them.
 func mergeArrayItems(a, b *openapi.Schema) error {
+	mergeItemBounds(a, b)
+
 	switch {
 	case len(a.PrefixItems) == 0 && len(b.PrefixItems) == 0:
 		return mergeItemsField(a, b)
 	case len(a.PrefixItems) == len(b.PrefixItems):
 		for i, ai := range a.PrefixItems {
-			if err := Schema(ai.Value, b.PrefixItems[i].Value, false); err != nil {
+			if err := Schema(deref(ai), deref(b.PrefixItems[i]), false); err != nil {
 				return &errpath.ErrField{Field: "prefixItems", Err: &errpath.ErrIndex{Index: i, Err: err}}
 			}
 		}
@@ -324,6 +330,17 @@ func mergeArrayItems(a, b *openapi.Schema) error {
 	default:
 		mergeArrayShapeMismatch(a, b)
 		return nil
+	}
+}
+
+// mergeItemBounds widens a's bounds on the number of items to cover b's too: an unbounded side leaves the result unbounded.
+func mergeItemBounds(a, b *openapi.Schema) {
+	a.MinItems = min(a.MinItems, b.MinItems)
+
+	if a.MaxItems != nil && b.MaxItems != nil {
+		a.MaxItems = new(max(*a.MaxItems, *b.MaxItems))
+	} else {
+		a.MaxItems = nil
 	}
 }
 
@@ -342,7 +359,7 @@ func mergeItemsField(a, b *openapi.Schema) error {
 		b.Items = a.Items
 		return nil
 	default:
-		return Schema(a.Items.Value, b.Items.Value, false)
+		return Schema(deref(a.Items), deref(b.Items), false)
 	}
 }
 
@@ -358,14 +375,14 @@ func mergeArrayShapeMismatch(a, b *openapi.Schema) {
 	merged := openapi.Schema{
 		Title:       a.Title,
 		Description: a.Description,
-		OneOf: openapi.SchemaRefList{
-			{Value: &aCopy},
-			{Value: &bCopy},
+		OneOf: openapi.SchemaList{
+			&aCopy,
+			&bCopy,
 		},
 	}
 
-	*a = merged
-	*b = merged
+	a.Replace(&merged)
+	b.Replace(&merged)
 }
 
 // mergeObjectProperties merges b's properties into a's, either directly or,
@@ -374,32 +391,31 @@ func mergeObjectProperties(a, b *openapi.Schema) error {
 	if ap := a.AdditionalProperties; ap != nil && ap.Schema != nil {
 		// is a string map
 		if bp := b.AdditionalProperties; bp != nil && bp.Schema != nil {
-			if err := Schema(ap.Schema.Value, bp.Schema.Value, false); err != nil {
+			if err := Schema(deref(ap.Schema), deref(bp.Schema), false); err != nil {
 				return &errpath.ErrField{Field: "additionalProperties", Err: err}
 			}
 		}
 
 		// merge all property values with prop
 		for _, prop := range b.Properties {
-			if err := Schema(ap.Schema.Value, prop.Value, false); err != nil {
+			if err := Schema(deref(ap.Schema), deref(prop), false); err != nil {
 				return &errpath.ErrField{Field: "additionalProperties", Err: err}
 			}
 		}
 	} else {
 		a.AdditionalProperties = mergeAdditionalProperties(a.AdditionalProperties, b.AdditionalProperties)
 
-		// Ensure a.Properties is initialized so schemaRefs can append to it
+		// Ensure a.Properties is initialized so schemas can append to it
 		// when a has no properties yet but b does.
 		if a.Properties == nil && len(b.Properties) > 0 {
-			a.Properties = openapi.SchemaRefs{}
+			a.Properties = openapi.Schemas{}
 		}
 
 		// get the maps that contains all properties
 		allProps := maps.Clone(a.Properties)
 		for _, allOf := range a.AllOf {
-			for k, prop := range allOf.Value.Properties.ByIndex() {
-				allProps.Set(k, &openapi.SchemaRef{Value: prop.Value})
-			}
+			// only looked up, so no index to set
+			maps.Insert(allProps, deref(allOf).Properties.ByIndex())
 		}
 
 		// get the map that we should add properties from b from
@@ -407,18 +423,18 @@ func mergeObjectProperties(a, b *openapi.Schema) error {
 		field := "properties"
 		if len(a.AllOf) > 0 {
 			field = "allOf"
-			addNewProps = openapi.SchemaRefs{}
+			addNewProps = openapi.Schemas{}
 		}
 
-		if err := schemaRefs(allProps, &addNewProps, b.Properties); err != nil {
+		if err := schemas(allProps, &addNewProps, b.Properties); err != nil {
 			return &errpath.ErrField{Field: field, Err: err}
 		}
 
 		if len(a.AllOf) > 0 && len(addNewProps) > 0 {
-			a.AllOf = append(a.AllOf, &openapi.SchemaRef{Value: &openapi.Schema{
+			a.AllOf = append(a.AllOf, &openapi.Schema{
 				Type:       openapi.TypeObject,
 				Properties: addNewProps,
-			}})
+			})
 		}
 	}
 
@@ -465,16 +481,6 @@ func mismatchError(field string, err error, a, b *openapi.Schema) error {
 
 var null = jsontext.Null.String()
 
-// isGeneratedFromNull checks whether the schema was generated from null
-// and we actually have no idea about the schema otherwise
-func isGeneratedFromNull(s *openapi.Schema) bool {
-	return string(s.Example) == null &&
-		s.Type == openapi.TypeObject &&
-		s.Format == "" &&
-		len(s.Properties) == 0 &&
-		s.AdditionalProperties == nil
-}
-
 // isDateTimeString reports whether the schema is a string with a date or date-time format.
 func isDateTimeString(s *openapi.Schema) bool {
 	return s.Type == openapi.TypeString &&
@@ -503,7 +509,7 @@ func isZeroDoubleExample(marshaledSchema string) bool {
 // the array's item schema.
 func mergeArrayParamMismatch(a, b *openapi.Schema) error {
 	if a.Type == openapi.TypeArray {
-		if err := Schema(a.Items.Value, b, false); err != nil {
+		if err := Schema(deref(a.Items), b, false); err != nil {
 			return fmt.Errorf("item of param: %w", err)
 		}
 
@@ -514,12 +520,12 @@ func mergeArrayParamMismatch(a, b *openapi.Schema) error {
 			}
 		}
 
-		*b = *a
+		b.Replace(a)
 
 		return nil
 	}
 
-	if err := Schema(a, b.Items.Value, false); err != nil {
+	if err := Schema(a, deref(b.Items), false); err != nil {
 		return fmt.Errorf("item of param: %w", err)
 	}
 
@@ -530,7 +536,7 @@ func mergeArrayParamMismatch(a, b *openapi.Schema) error {
 		}
 	}
 
-	*a = *b
+	a.Replace(b)
 
 	return nil
 }
@@ -543,7 +549,7 @@ func mergeOneOf(a, b *openapi.Schema) error {
 	// alternatives into a in turn rather than treating b as a single schema
 	if len(b.OneOf) > 0 {
 		for i, alt := range b.OneOf {
-			if err := mergeOneOf(a, alt.Value); err != nil {
+			if err := mergeOneOf(a, deref(alt)); err != nil {
 				return &errpath.ErrField{Field: "oneOf", Err: &errpath.ErrIndex{Index: i, Err: err}}
 			}
 		}
@@ -554,18 +560,18 @@ func mergeOneOf(a, b *openapi.Schema) error {
 	// b carries no real type information (e.g. it was generated from a null
 	// value in this particular sample); there's no way to tell which
 	// alternative it would belong to, so there's nothing to merge
-	if b.Type == "" || isGeneratedFromNull(b) {
+	if b.Type == "" || b.Type == openapi.TypeNull {
 		return nil
 	}
 
-	idx := slices.IndexFunc(a.OneOf, func(alt *openapi.SchemaRef) bool {
-		return oneOfBranchMatches(alt.Value, b)
+	idx := slices.IndexFunc(a.OneOf, func(alt *openapi.Schema) bool {
+		return oneOfBranchMatches(deref(alt), b)
 	})
 	if idx == -1 {
 		return &errpath.ErrField{Field: "oneOf", Err: fmt.Errorf("no branch matches type %q", b.Type)}
 	}
 
-	branch := a.OneOf[idx].Value
+	branch := deref(a.OneOf[idx])
 	if err := Schema(branch, b, false); err != nil {
 		return &errpath.ErrField{
 			Field: "oneOf",
@@ -609,12 +615,21 @@ func mergeDateTimeOrTimestamp(a, b *openapi.Schema) {
 	merged := openapi.Schema{
 		Title:       a.Title,
 		Description: a.Description,
-		OneOf: openapi.SchemaRefList{
-			{Value: &strCopy},
-			{Value: &intCopy},
+		OneOf: openapi.SchemaList{
+			&strCopy,
+			&intCopy,
 		},
 	}
 
-	*a = merged
-	*b = merged
+	a.Replace(&merged)
+	b.Replace(&merged)
+}
+
+// deref is the schema s stands for: the one it refers to, if it is a reference.
+func deref(s *openapi.Schema) *openapi.Schema {
+	if s != nil && s.Ref != nil {
+		return s.Ref.Value
+	}
+
+	return s
 }

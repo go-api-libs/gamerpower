@@ -93,9 +93,9 @@ func RenameSchema(doc *openapi.Document, oldName, newName string) error {
 
 // renameRefs rewrites every schema reference in doc from old to new.
 func renameRefs(doc *openapi.Document, old, new string) {
-	walkSchemaRefs(doc, func(r *openapi.SchemaRef) {
-		if r.Ref != nil && r.Ref.Identifier == old {
-			r.Ref.Identifier = new
+	walkSchemas(doc, func(s *openapi.Schema) {
+		if s.Ref != nil && s.Ref.Identifier == old {
+			s.Ref.Identifier = new
 		}
 	})
 }

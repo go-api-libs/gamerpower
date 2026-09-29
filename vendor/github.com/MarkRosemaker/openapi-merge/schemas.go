@@ -5,11 +5,12 @@ import (
 	"github.com/MarkRosemaker/openapi"
 )
 
-func SchemaRefs(a *openapi.SchemaRefs, b openapi.SchemaRefs) error {
-	return schemaRefs(*a, a, b)
+// Schemas merges b into a: a schema only in b is added, one in both is merged.
+func Schemas(a *openapi.Schemas, b openapi.Schemas) error {
+	return schemas(*a, a, b)
 }
 
-func schemaRefs(aAll openapi.SchemaRefs, aToSet *openapi.SchemaRefs, b openapi.SchemaRefs) error {
+func schemas(aAll openapi.Schemas, aToSet *openapi.Schemas, b openapi.Schemas) error {
 	for keyB, sB := range b.ByIndex() {
 		sA, ok := aAll[keyB]
 		if !ok {
@@ -18,7 +19,7 @@ func schemaRefs(aAll openapi.SchemaRefs, aToSet *openapi.SchemaRefs, b openapi.S
 		}
 
 		// merge the properties
-		if err := Schema(sA.Value, sB.Value, false); err != nil {
+		if err := Schema(deref(sA), deref(sB), false); err != nil {
 			return &errpath.ErrKey{Key: keyB, Err: err}
 		}
 	}

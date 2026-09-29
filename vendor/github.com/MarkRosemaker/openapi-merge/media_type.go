@@ -8,7 +8,7 @@ import (
 func MediaType(a, b *openapi.MediaType) error {
 	if b.Schema != nil {
 		if a.Schema != nil {
-			if err := Schema(a.Schema.Value, b.Schema.Value, false); err != nil {
+			if err := Schema(deref(a.Schema), deref(b.Schema), false); err != nil {
 				return &errpath.ErrField{Field: "schema", Err: err}
 			}
 		} else {

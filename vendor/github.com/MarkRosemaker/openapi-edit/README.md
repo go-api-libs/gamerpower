@@ -94,9 +94,9 @@ if err := edit.RedirectSchema(doc, "GetPetOkResponse", "Pet", ""); err != nil {
 combination of content:
 
 1. It finds every `$ref` in the document whose value is
-   `"#/components/schemas/GetPetOkResponse"` (via the same [`walkSchemaRefs`]
+   `"#/components/schemas/GetPetOkResponse"` (via the same [`walkSchemas`]
    traversal `RenameSchema` uses) and rewrites each one to
-   `"#/components/schemas/Pet"`.
+   `"#/components/schemas/Pet"`, now resolving to `Pet`.
 2. It deletes the `"GetPetOkResponse"` entry from `components.schemas`.
 3. It does not look at, merge, or otherwise change the *content* of either
    schema. `Pet`'s definition (its properties, its bounds, its wording) is
@@ -104,8 +104,8 @@ combination of content:
    simply gone, not folded into `Pet`'s.
 
 If `GetPetOkResponse` carried bounds or wording worth keeping, pass it as
-`description` instead of an empty string: it becomes the `$ref`-level
-`description` on every reference this repoints, replacing whatever
+`description` instead of an empty string: it becomes the `description`
+beside the `$ref` of every reference this repoints, replacing whatever
 description that reference already had. That's the one piece of
 `GetPetOkResponse` this function can carry forward — everything else about
 its definition is discarded the moment step 2 above runs, so this is the

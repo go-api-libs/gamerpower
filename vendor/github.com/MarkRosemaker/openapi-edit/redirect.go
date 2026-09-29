@@ -44,16 +44,18 @@ func RedirectSchema(doc *openapi.Document, oldName, newName, description string)
 
 	old, new := schemaRefPrefix+oldName, schemaRefPrefix+newName
 
-	walkSchemaRefs(doc, func(r *openapi.SchemaRef) {
-		if r.Ref == nil || r.Ref.Identifier != old {
+	target := schemas[newName]
+
+	walkSchemas(doc, func(s *openapi.Schema) {
+		if s.Ref == nil || s.Ref.Identifier != old {
 			return
 		}
 
 		if description != "" {
-			r.Ref.Description = description
+			s.Description = description
 		}
 
-		r.Ref.Identifier = new
+		s.Ref.Identifier, s.Ref.Value = new, target
 	})
 
 	delete(schemas, oldName)

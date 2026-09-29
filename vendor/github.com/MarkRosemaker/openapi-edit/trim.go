@@ -56,29 +56,26 @@ func trimJSON(v jsontext.Value, maxItems int) (jsontext.Value, error) {
 func TrimSchemaExamples(doc *openapi.Document, maxItems int) error {
 	var trimErr error
 
-	trim := func(s *openapi.Schema) {
-		if trimErr != nil || s == nil || len(s.Example) == 0 {
-			return
+	trim := func(v jsontext.Value) jsontext.Value {
+		if trimErr != nil || len(v) == 0 {
+			return v
 		}
 
-		trimmed, err := TrimExample(s.Example, maxItems)
+		trimmed, err := TrimExample(v, maxItems)
 		if err != nil {
 			trimErr = fmt.Errorf("trimming example: %w", err)
-			return
+			return v
 		}
 
-		s.Example = trimmed
+		return trimmed
 	}
 
-	// components.schemas holds *openapi.Schema directly, with no enclosing
-	// SchemaRef of its own, so a schema that nothing else in the document
-	// references would never reach fn below on its own.
-	for _, s := range doc.Components.Schemas {
-		trim(s)
-	}
+	walkSchemas(doc, func(s *openapi.Schema) {
+		s.Example = trim(s.Example)
 
-	walkSchemaRefs(doc, func(r *openapi.SchemaRef) {
-		trim(r.Value)
+		for i, ex := range s.Examples {
+			s.Examples[i] = trim(ex)
+		}
 	})
 
 	return trimErr
