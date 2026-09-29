@@ -22,11 +22,11 @@ func nameMediaType(rspOrReqBodyName, nameMediaRange string,
 
 func mediaType(d *openapi.Document, mt *openapi.MediaType, mtName string, modeSchema mode) error {
 	if mt.Schema != nil {
-		if title := mt.Schema.Value.Title; title != "" {
+		if title := mt.Schema.Title; title != "" {
 			mtName = strcase.ToGoPascal(title)
 		}
 
-		if err := schemaRef(d, mt.Schema, mtName, modeSchema); err != nil {
+		if err := inlineSchema(d, mt.Schema, mtName, modeSchema); err != nil {
 			return &errpath.ErrField{Field: "schema", Err: err}
 		}
 	}

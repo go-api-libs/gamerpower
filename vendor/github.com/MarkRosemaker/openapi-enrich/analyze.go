@@ -164,7 +164,7 @@ func processQueryParams(doc *openapi.Document, pi *openapi.PathItem, op *openapi
 
 			schema = &openapi.Schema{
 				Type:  openapi.TypeArray,
-				Items: &openapi.SchemaRef{Value: items},
+				Items: items,
 			}
 			explodeFalse = true
 		} else {
@@ -187,7 +187,7 @@ func processQueryParams(doc *openapi.Document, pi *openapi.PathItem, op *openapi
 		incoming := &openapi.Parameter{
 			Name:   name,
 			In:     openapi.ParameterLocationQuery,
-			Schema: &openapi.SchemaRef{Value: schema},
+			Schema: schema,
 		}
 		if explodeFalse {
 			incoming.Explode = new(false)
@@ -295,7 +295,7 @@ func processCustomHeader(doc *openapi.Document, piParams openapi.ParameterList, 
 		Name:     name,
 		In:       openapi.ParameterLocationHeader,
 		Required: true,
-		Schema:   &openapi.SchemaRef{Value: schema},
+		Schema:   schema,
 	})
 }
 
@@ -312,7 +312,7 @@ func processRequestBody(op *openapi.Operation, body []byte, contentType string) 
 			Content:  openapi.Content{},
 		}}
 		op.RequestBody.Value.Content.Set(mr, &openapi.MediaType{
-			Schema: &openapi.SchemaRef{Value: schema},
+			Schema: schema,
 		})
 
 		return nil
@@ -321,19 +321,19 @@ func processRequestBody(op *openapi.Operation, body []byte, contentType string) 
 	rb := op.RequestBody.Value
 	if existing, ok := rb.Content[mr]; ok {
 		if existing.Schema != nil {
-			if err := merge.Schema(existing.Schema.Value, schema, false); err != nil {
+			if err := merge.Schema(deref(existing.Schema), schema, false); err != nil {
 				return err
 			}
 
-			return growEnums(existing.Schema.Value, body)
+			return growEnums(deref(existing.Schema), body)
 		}
 
-		existing.Schema = &openapi.SchemaRef{Value: schema}
+		existing.Schema = schema
 
 		return nil
 	}
 
-	rb.Content.Set(mr, &openapi.MediaType{Schema: &openapi.SchemaRef{Value: schema}})
+	rb.Content.Set(mr, &openapi.MediaType{Schema: schema})
 
 	return nil
 }
@@ -365,7 +365,7 @@ func processResponse(op *openapi.Operation, resp *cassette.Response) error {
 			continue
 		}
 
-		if err := growEnums(mt.Schema.Value, resp.Body); err != nil {
+		if err := growEnums(deref(mt.Schema), resp.Body); err != nil {
 			return &errpath.ErrField{Field: "content", Err: err}
 		}
 	}
@@ -400,8 +400,8 @@ func addParam(doc *openapi.Document, piParams openapi.ParameterList, op *openapi
 	}
 
 	if ref := componentParamRef(doc, incoming.Name, incoming.In); ref != nil {
-		if ref.Value.Schema != nil && ref.Value.Schema.Value.Type == "" {
-			ref.Value.Schema.Value.Type = openapi.TypeString
+		if ref.Value.Schema != nil && deref(ref.Value.Schema).Type == "" {
+			deref(ref.Value.Schema).Type = openapi.TypeString
 		}
 
 		op.Parameters = append(op.Parameters, ref)
@@ -418,8 +418,8 @@ func addParam(doc *openapi.Document, piParams openapi.ParameterList, op *openapi
 func findParam(piParams, opParams openapi.ParameterList, name string, in openapi.ParameterLocation) *openapi.Parameter {
 	for _, p := range append(opParams, piParams...) {
 		if p.Value != nil && p.Value.Name == name && p.Value.In == in {
-			if p.Value.Schema.Value.Type == "" {
-				p.Value.Schema.Value.Type = openapi.TypeString
+			if deref(p.Value.Schema).Type == "" {
+				deref(p.Value.Schema).Type = openapi.TypeString
 			}
 
 			return p.Value
@@ -509,7 +509,7 @@ func addPathParams(pi *openapi.PathItem, p openapi.Path, reqSegments, paramNames
 				Name:     el.name,
 				In:       openapi.ParameterLocationPath,
 				Required: true,
-				Schema:   &openapi.SchemaRef{Value: schema},
+				Schema:   schema,
 			},
 		})
 	}

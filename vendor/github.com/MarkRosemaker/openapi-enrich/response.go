@@ -38,7 +38,7 @@ func buildResponse(resp *cassette.Response) (*openapi.Response, error) {
 
 		r.Content = openapi.Content{}
 		r.Content.Set(openapi.MediaRange(mediaType), &openapi.MediaType{
-			Schema: &openapi.SchemaRef{Value: schema},
+			Schema: schema,
 		})
 
 	case mediaType == "text/plain":
@@ -46,7 +46,7 @@ func buildResponse(resp *cassette.Response) (*openapi.Response, error) {
 		if !strings.EqualFold(bodyStr, description) {
 			r.Content = openapi.Content{}
 			r.Content.Set(openapi.MediaRange(mediaType), &openapi.MediaType{
-				Schema: &openapi.SchemaRef{Value: &openapi.Schema{Type: openapi.TypeString}},
+				Schema: &openapi.Schema{Type: openapi.TypeString},
 			})
 		}
 

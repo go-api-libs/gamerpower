@@ -57,7 +57,7 @@ func growEnumsValue(s *openapi.Schema, v any) error {
 				continue
 			}
 
-			if err := growEnumsValue(propRef.Value, val); err != nil {
+			if err := growEnumsValue(deref(propRef), val); err != nil {
 				return &errpath.ErrField{Field: "properties", Err: &errpath.ErrKey{Key: key, Err: err}}
 			}
 		}
@@ -68,7 +68,7 @@ func growEnumsValue(s *openapi.Schema, v any) error {
 					continue
 				}
 
-				if err := growEnumsValue(ap.Schema.Value, val); err != nil {
+				if err := growEnumsValue(deref(ap.Schema), val); err != nil {
 					return &errpath.ErrField{Field: "additionalProperties", Err: &errpath.ErrKey{Key: key, Err: err}}
 				}
 			}
@@ -81,7 +81,7 @@ func growEnumsValue(s *openapi.Schema, v any) error {
 		}
 
 		for i, elem := range arr {
-			if err := growEnumsValue(s.Items.Value, elem); err != nil {
+			if err := growEnumsValue(deref(s.Items), elem); err != nil {
 				return &errpath.ErrIndex{Index: i, Err: err}
 			}
 		}

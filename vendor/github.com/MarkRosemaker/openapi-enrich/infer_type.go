@@ -99,7 +99,7 @@ func (w *schemaWalker) callback(c openapi.Callback) {
 
 func (w *schemaWalker) parameter(r *openapi.ParameterRef) {
 	if r != nil && r.Value != nil {
-		w.schemaRef(r.Value.Schema)
+		w.schema(r.Value.Schema)
 		w.content(r.Value.Content)
 	}
 }
@@ -132,7 +132,7 @@ func (w *schemaWalker) content(c openapi.Content) {
 			continue
 		}
 
-		w.schemaRef(mt.Schema)
+		w.schema(mt.Schema)
 
 		for _, e := range mt.Encoding {
 			if e != nil {
@@ -142,15 +142,9 @@ func (w *schemaWalker) content(c openapi.Content) {
 	}
 }
 
-func (w *schemaWalker) schemaRef(r *openapi.SchemaRef) {
-	if r != nil {
-		w.schema(r.Value)
-	}
-}
-
-func (w *schemaWalker) schemaRefs(l openapi.SchemaRefList) {
-	for _, r := range l {
-		w.schemaRef(r)
+func (w *schemaWalker) schemaList(l openapi.SchemaList) {
+	for _, s := range l {
+		w.schema(s)
 	}
 }
 
@@ -163,19 +157,23 @@ func (w *schemaWalker) schema(s *openapi.Schema) {
 
 	w.fn(s)
 
-	w.schemaRefs(s.AllOf)
-	w.schemaRefs(s.OneOf)
-	w.schemaRefs(s.AnyOf)
-	w.schemaRef(s.Not)
-	w.schemaRefs(s.PrefixItems)
-	w.schemaRef(s.Items)
+	if s.Ref != nil {
+		w.schema(s.Ref.Value)
+	}
+
+	w.schemaList(s.AllOf)
+	w.schemaList(s.OneOf)
+	w.schemaList(s.AnyOf)
+	w.schema(s.Not)
+	w.schemaList(s.PrefixItems)
+	w.schema(s.Items)
 
 	if s.AdditionalProperties != nil {
-		w.schemaRef(s.AdditionalProperties.Schema)
+		w.schema(s.AdditionalProperties.Schema)
 	}
 
 	for _, r := range s.Properties {
-		w.schemaRef(r)
+		w.schema(r)
 	}
 }
 

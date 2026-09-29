@@ -53,6 +53,10 @@ What it infers:
   repeated observations are merged.
 - **Schema formats** — UUID, URI, email, date-time, IPv4, IPv6 are detected
   automatically from string values.
+- **Nulls and empty arrays** — a value only ever seen as `null` has the type
+  `null`, and becomes nullable once it is seen with a real type
+  (`["string", "null"]`). An array only ever seen empty is
+  `{"type": "array", "maxItems": 0}`, until a non-empty one shows its items.
 - **Schema types** — a schema in the given document that has no `type` gets
   the one its `enum` or `const` values share, e.g. `{"const": 401}` becomes
   an `integer`; a `null` among them makes it nullable.

@@ -57,9 +57,8 @@ func decodeSchema(dec *jsontext.Decoder) (*openapi.Schema, error) {
 		return &openapi.Schema{Type: openapi.TypeBoolean}, nil
 	case 'f': // false
 		return &openapi.Schema{Type: openapi.TypeBoolean}, nil
-	case 'n': // null → object placeholder; isGeneratedFromNull in openapi-merge checks Example=="null"
-		// TODO: perhaps it would be better to actually set TypeNull here
-		return &openapi.Schema{Type: openapi.TypeObject, Example: jsontext.Value("null")}, nil
+	case 'n': // null: merged with a real type later, it makes that type nullable
+		return &openapi.Schema{Type: openapi.TypeNull}, nil
 	case '{': // begin object
 		return decodeObjectSchema(dec)
 	case '[': // begin array
@@ -139,17 +138,17 @@ func decodeObjectSchema(dec *jsontext.Decoder) (*openapi.Schema, error) {
 
 		return &openapi.Schema{
 			Type:                 openapi.TypeObject,
-			AdditionalProperties: &openapi.AdditionalProperties{Schema: &openapi.SchemaRef{Value: valueSchema}},
+			AdditionalProperties: &openapi.AdditionalProperties{Schema: valueSchema},
 		}, nil
 	}
 
 	// Named properties — build the schema as before.
 	s := &openapi.Schema{
 		Type:       openapi.TypeObject,
-		Properties: openapi.SchemaRefs{},
+		Properties: openapi.Schemas{},
 	}
 	for _, p := range pairs {
-		s.Properties.Set(p.key, &openapi.SchemaRef{Value: p.schema})
+		s.Properties.Set(p.key, p.schema)
 		s.Required = append(s.Required, p.key)
 	}
 
@@ -189,13 +188,13 @@ func decodeArraySchema(dec *jsontext.Decoder) (*openapi.Schema, error) {
 	}
 
 	if len(elems) == 0 {
-		// empty array → placeholder object items, refined on non-empty array
-		s.Items = &openapi.SchemaRef{Value: &openapi.Schema{Type: openapi.TypeObject, Example: jsontext.Value("null")}}
+		// seen empty, so nothing is known of its items; merged with a non-empty array later, it takes that one's
+		s.MaxItems = new(uint(0))
 		return s, nil
 	}
 
 	if item, ok := mergeHomogeneous(elems); ok {
-		s.Items = &openapi.SchemaRef{Value: item}
+		s.Items = item
 		return s, nil
 	}
 
@@ -203,9 +202,9 @@ func decodeArraySchema(dec *jsontext.Decoder) (*openapi.Schema, error) {
 	// array (e.g. OpenSky's state vectors: [icao24 string, ..., time_position
 	// int, ..., on_ground bool, ...]) mixes types by position, which
 	// prefixItems -- not items -- is meant to describe.
-	s.PrefixItems = make(openapi.SchemaRefList, len(elems))
+	s.PrefixItems = make(openapi.SchemaList, len(elems))
 	for i, elem := range elems {
-		s.PrefixItems[i] = &openapi.SchemaRef{Value: elem}
+		s.PrefixItems[i] = elem
 	}
 
 	return s, nil
@@ -286,4 +285,13 @@ func stringFormat(s string) openapi.Format {
 func isUUID(s string) bool {
 	_, err := uuid.Parse(s)
 	return err == nil
+}
+
+// deref is the schema s stands for: the one it refers to, if it is a reference.
+func deref(s *openapi.Schema) *openapi.Schema {
+	if s != nil && s.Ref != nil {
+		return s.Ref.Value
+	}
+
+	return s
 }
