@@ -20,17 +20,17 @@ github.com/MarkRosemaker/openapi-codegen/cmd/openapi-codegen
 github.com/MarkRosemaker/openapi-codegen/config
 github.com/MarkRosemaker/openapi-codegen/ir
 github.com/MarkRosemaker/openapi-codegen/render
-# github.com/MarkRosemaker/openapi-compare v0.0.0-20260929233520-469e33e41b4a
+# github.com/MarkRosemaker/openapi-compare v0.0.0-20260930040218-2be37b91d30d
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-compare/schema
 # github.com/MarkRosemaker/openapi-compress v0.0.0-20260929234906-cfbb08493ad5
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-compress
 github.com/MarkRosemaker/openapi-compress/cmd/openapi-compress
-# github.com/MarkRosemaker/openapi-edit v0.0.0-20260929233521-7680910591e8
+# github.com/MarkRosemaker/openapi-edit v0.0.0-20260930040218-4edbc1bc701e
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-edit
-# github.com/MarkRosemaker/openapi-enrich v0.0.0-20260929233721-c135d69562e0
+# github.com/MarkRosemaker/openapi-enrich v0.0.0-20260930040343-80d566776e63
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-enrich
 github.com/MarkRosemaker/openapi-enrich/cassette
