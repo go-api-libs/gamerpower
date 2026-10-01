@@ -126,6 +126,30 @@ Redirecting a schema onto itself does nothing and reports no error.
 Otherwise it fails, **changing nothing at all**, if either name is not in
 `components.schemas` (`ErrSchemaNotFound`).
 
+### Many at once
+
+Each call walks the whole document, so a caller consolidating hundreds of
+schemas should hand them over together. `RenameSchemas` and `RedirectSchemas`
+take a map from old name to new and walk the document a fixed number of times
+however many names the map holds:
+
+```go
+if err := edit.RedirectSchemas(doc, map[string]string{
+    "GetPetOkResponse":   "Pet",
+    "ListPetsOkItem":     "Pet",
+    "GetOwnerOkResponse": "Owner",
+}); err != nil {
+    log.Fatal(err)
+}
+```
+
+The result is the same as calling the single-name function for each entry, and
+a failure again changes nothing. `RenameSchemas` renames all its schemas
+together, so two can swap names; two taking the same new name is
+`ErrSchemaExists`. `RedirectSchemas` refuses to redirect onto a schema it is
+also redirecting away (`ErrSchemaNotFound`), since that schema would not be
+there afterwards.
+
 This is deliberately *not* the same operation as combining two schemas into
 one wider shape (adding one's properties, enum values, etc. to the other) —
 that's [`openapi-merge`]'s job, and it works on two schema values directly
@@ -146,9 +170,10 @@ node being changed.
 
 **In scope**
 
-- ✅ Renaming a component and rewriting every reference to it (`RenameSchema`)
+- ✅ Renaming a component and rewriting every reference to it (`RenameSchema`,
+  `RenameSchemas`)
 - ✅ Repointing every reference to a duplicate component onto the one that
-  survives, and removing the duplicate (`RedirectSchema`)
+  survives, and removing the duplicate (`RedirectSchema`, `RedirectSchemas`)
 - Moving a definition between inline and `components`, keeping references intact
 
 **Out of scope**

@@ -163,16 +163,23 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 		opt(c)
 	}
 
-	{{ with .Auth.Bearer.Name }}
+	{{ if and .Auth.Bearer.Name .Auth.Basic.UsernameEnvName }}
+	{{- /* each operation checks the credential it sends, so one of them is enough here */}}
+	if c.bearer == "" && c.basic == "" {
+		return nil, errors.New("neither bearer token {{ .Auth.Bearer.Name }} nor basic auth {{ .Auth.Basic.UsernameEnvName }} / {{ .Auth.Basic.PasswordEnvName }} provided")
+	}
+	{{ else }}
+	{{ if eq .Auth.Default "bearer" }}{{ with .Auth.Bearer.Name }}
 	if c.bearer == "" {
 		return nil, errors.New("bearer token {{ . }} not provided")
 	}
-	{{ end }}
+	{{ end }}{{ end }}
 
-	{{ with .Auth.Basic.UsernameEnvName }}
+	{{ if eq .Auth.Default "basic" }}{{ with .Auth.Basic.UsernameEnvName }}
 	if c.basic == "" {
 		return nil, errors.New("basic auth {{ . }} / {{ $.Auth.Basic.PasswordEnvName }} not provided")
 	}
+	{{ end }}{{ end }}
 	{{ end }}
 
 	{{ with .APIKey }}
@@ -225,14 +232,19 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 }
 {{ end }}
 
+{{- $withResult := and .SuccessReturn (not .RawBytesSuccess) }}
 {{ with .Description}}
 	{{- toGoComment . }}
+	{{- if $withResult }}
 	// You can define a custom result to unmarshal the response into.
+	{{- end }}
 	//
 {{- else }}
 	{{- with .Summary -}}
 	{{ toGoComment . }}
+	{{- if $withResult }}
 	// You can define a custom result to unmarshal the response into.
+	{{- end }}
 	//
 	{{- end }}
 {{- end }}
@@ -248,6 +260,17 @@ func (c *Client) {{.Name}}WithResult[R any](ctx context.Context{{range .PathPara
 {{- else -}}
 func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}} {{.Type}}{{end}}{{if .ParamsInStruct}}, params {{ if not .ParamsInStruct.Required }}*{{ end }}{{.ParamStructName}}{{end}}{{if .RequestBody}}, body {{if .RequestBody.Required}}{{.RequestBody.TypeName}}{{else}}*{{.RequestBody.TypeName}}{{end}}{{end}}) error {
 {{- end }}
+{{- if and $.Auth.Bearer.Name $.Auth.Basic.UsernameEnvName }}
+{{- if eq .Auth "bearer" }}
+	if c.bearer == "" {
+		return {{if .SuccessReturn}}nil, {{end}}errors.New("bearer token {{ $.Auth.Bearer.Name }} not provided")
+	}
+{{ else if eq .Auth "basic" }}
+	if c.basic == "" {
+		return {{if .SuccessReturn}}nil, {{end}}errors.New("basic auth {{ $.Auth.Basic.UsernameEnvName }} / {{ $.Auth.Basic.PasswordEnvName }} not provided")
+	}
+{{ end }}
+{{- end }}
 {{/* Always declared: the request below uses u whether or not the operation
      adds path segments. JoinPath returns a copy, so assigning c.baseURL
      directly would let a query string mutate the client's base URL. */}}
@@ -260,7 +283,11 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 	{{- end }}
 		q := make(url.Values, {{ len .QueryParams }})
 {{- range .QueryParams }}
-	{{ if .Required }}
+	{{ if .Item }}
+		for _, v := range {{ .VarName }} {
+			q.Add({{printf "%q" .JSONName}}, {{ .Item.FormatExpr }})
+		}
+	{{ else if .Required }}
 		q[{{printf "%q" .JSONName}}] = []string{ {{- .FormatExpr -}} }
 	{{ else }}
 		if {{ .NotZero }} {
@@ -279,10 +306,9 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 {{ end -}}
 	req := (&http.Request{
 		Header: http.Header{
-			{{ if $.Auth.Bearer.Name -}}
+			{{ if eq .Auth "bearer" -}}
 			"Authorization":  []string{c.bearer},
-			{{ end -}}
-			{{ if $.Auth.Basic.UsernameEnvName -}}
+			{{ else if eq .Auth "basic" -}}
 			"Authorization":  []string{c.basic},
 			{{ end -}}
 			{{ range $.GlobalParams -}}
@@ -346,11 +372,14 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 	{{ if ne .GoConstant "default" -}}
 		case {{ end }}{{ .GoConstant }}:
 		{{ with .Description }}{{ toGoComment . }}{{ end }}
-{{- if or .IsSuccess .GoType }}
+{{- if and .IsSuccess $op.EmptySuccess (not $.Debug) }}
+		{{- /* an empty object holds nothing to return, so the body is not read */}}
+		return nil
+{{- else if or .IsSuccess .GoType }}
 		switch mt, _, _ := strings.Cut(rsp.Header.Get("Content-Type"), ";"); mt {
 		case "{{ .ContentType }}":
 			{{- if eq .ContentType "application/json" }}
-			var out {{ if .IsSuccess }}R{{ else }}{{ .GoType }}{{ end }}
+			var out {{ if and .IsSuccess $op.SuccessReturn }}R{{ else }}{{ .GoType }}{{ end }}
 			if err := json.UnmarshalRead(rsp.Body, &out, jsonOpts); err != nil {
 				{{ if $.Debug -}}
 				if c.debug {
@@ -363,8 +392,10 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 				return {{if $op.SuccessReturn}}nil, {{end}}api.WrapDecodingError(rsp, err)
 			}
 
-			{{ if .IsSuccess -}}
+			{{ if and .IsSuccess $op.SuccessReturn -}}
 			return &out, nil
+			{{ else if .IsSuccess -}}
+			return nil
 			{{ else -}}
 			return {{if $op.SuccessReturn}}nil, {{end}}api.NewErrCustom(rsp, &out)
 			{{ end -}}

@@ -50,6 +50,17 @@ func matchInteractions(doc *ir.Document, interactions cassette.Interactions) err
 
 		q := u.Query()
 		for _, qp := range op.QueryParams {
+			if qp.Item != nil {
+				if vals := q[qp.JSONName]; len(vals) > 0 {
+					call.QueryArgs = append(call.QueryArgs, ir.InteractionParam{
+						FieldName: qp.FieldName,
+						Literal:   sliceLiteral(qp, vals),
+					})
+				}
+
+				continue
+			}
+
 			val := q.Get(qp.JSONName)
 			if val != "" {
 				call.QueryArgs = append(call.QueryArgs, ir.InteractionParam{
@@ -283,6 +294,16 @@ func extractSegmentParam(tmpl, value string, out map[string]string) bool {
 // goLiteralForType returns a Go literal expression for value given a path,
 // query, or header param, mirroring ir.Param.FormatExpr, which performs the
 // same conversion in the other direction when the client builds the request.
+// sliceLiteral is a Go literal of an array parameter holding values.
+func sliceLiteral(p ir.Param, values []string) string {
+	elems := make([]string, len(values))
+	for i, v := range values {
+		elems[i] = goLiteralForType(*p.Item, v)
+	}
+
+	return p.Type + "{" + strings.Join(elems, ", ") + "}"
+}
+
 func goLiteralForType(p ir.Param, value string) string {
 	switch p.Type {
 	case "int", "int32", "int64", "uint", "uint32", "uint64", "float32", "float64", "bool":

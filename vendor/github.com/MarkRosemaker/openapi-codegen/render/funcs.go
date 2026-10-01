@@ -1,7 +1,6 @@
 package render
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 	"text/template"
@@ -101,11 +100,42 @@ func toGoComment(in string) string {
 	in = strings.ReplaceAll(in, "\r\n", "\n")
 	in = strings.ReplaceAll(in, "\r", "\n")
 
+	lines := dedent(strings.Split(in, "\n"))
+
 	// Add comment to each line
-	var lines []string
-	for line := range strings.SplitSeq(in, "\n") {
-		lines = append(lines, fmt.Sprintf("// %s", line))
+	for i, line := range lines {
+		lines[i] = "// " + line
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// dedent removes the indentation lines after the first share, as a docstring has it, so that it does not become a
+// code block in the Go doc comment. Lines indented beyond the rest keep the difference.
+func dedent(lines []string) []string {
+	common := -1
+	for _, line := range lines[1:] {
+		trimmed := strings.TrimLeft(line, " \t")
+		if trimmed == "" {
+			continue
+		}
+
+		if indent := len(line) - len(trimmed); common < 0 || indent < common {
+			common = indent
+		}
+	}
+
+	if common <= 0 {
+		return lines
+	}
+
+	for i := 1; i < len(lines); i++ {
+		if len(lines[i]) >= common {
+			lines[i] = lines[i][common:]
+		} else {
+			lines[i] = strings.TrimLeft(lines[i], " \t")
+		}
+	}
+
+	return lines
 }

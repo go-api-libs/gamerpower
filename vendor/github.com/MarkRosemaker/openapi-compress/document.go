@@ -1,8 +1,10 @@
 package compress
 
 import (
+	"encoding/json/v2"
 	"math"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 
@@ -79,7 +81,10 @@ func deduplicateSchemasAtThreshold(d *openapi.Document, threshold float64) (map[
 		return nil, nil
 	}
 
-	names := sortedSchemaNames(schemas)
+	// a bare scalar carries nothing but its name and documentation, which merging would erase
+	names := slices.DeleteFunc(sortedSchemaNames(schemas), func(name string) bool {
+		return isBareScalar(schemas[name])
+	})
 
 	// replacements maps a name-to-remove to its canonical name.
 	replacements := map[string]string{}
@@ -284,4 +289,22 @@ func sortedSchemaNames(schemas openapi.Schemas) []string {
 	sort.Strings(names)
 
 	return names
+}
+
+// isBareScalar reports whether s is a string, number, integer or boolean with no constraint of its own: nothing but a
+// type and documentation, such as a component named idRequest that is only {"type": "string"}.
+func isBareScalar(s *openapi.Schema) bool {
+	switch s.Type {
+	case openapi.TypeString, openapi.TypeNumber, openapi.TypeInteger, openapi.TypeBoolean:
+	default:
+		return false
+	}
+
+	c := *s
+	c.Type, c.Title, c.Description, c.Deprecated = "", "", "", false
+	c.Default, c.Example, c.Examples, c.Extensions = nil, nil, nil, nil
+
+	b, err := json.Marshal(&c)
+
+	return err == nil && string(b) == "{}"
 }

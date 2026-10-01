@@ -64,7 +64,26 @@ func RegisterService(svc Service, mux *http.ServeMux, pathPrefix string) {
 
 		var params {{.ParamStructName}}
 		q := r.URL.Query()
-{{- range .QueryParams}}
+{{- range $qp := .QueryParams}}
+{{- if .Item}}
+		for _, s := range q[{{printf "%q" .JSONName}}] {
+{{- with .Item}}
+{{- if .ParseErrFree}}
+			params.{{$qp.FieldName}} = append(params.{{$qp.FieldName}}, {{.ParseExpr}})
+{{- else}}
+			rawParam, err := {{.ParseExpr}}
+			if err != nil {
+				msg := fmt.Sprintf("invalid {{$qp.JSONName}}: %v", err)
+				l.DebugContext(ctx, "Bad Request", slog.String("msg", msg))
+				http.Error(w, msg, http.StatusBadRequest)
+				return
+			}
+
+			params.{{$qp.FieldName}} = append(params.{{$qp.FieldName}}, {{with .ParseCast}}{{.}}(rawParam){{else}}rawParam{{end}})
+{{- end}}
+{{- end}}
+		}
+{{- else}}
 		if s := q.Get({{printf "%q" .JSONName}}); s != "" {
 {{- if .ParseErrFree}}
 			params.{{.FieldName}} = {{.ParseExpr}}
@@ -83,6 +102,7 @@ func RegisterService(svc Service, mux *http.ServeMux, pathPrefix string) {
 {{- end}}
 {{- end}}
 		}
+{{- end}}
 {{- end}}
 {{- end}}
 {{- if .RequestBody}}
@@ -121,10 +141,17 @@ func RegisterService(svc Service, mux *http.ServeMux, pathPrefix string) {
 			return
 		}
 
-{{ if .SuccessReturn -}}
+{{ if or .SuccessReturn .EmptySuccess -}}
 		w.Header().Set("Content-Type", {{printf "%q" $successContentType}})
 {{- end }}
 		w.WriteHeader({{$successCode}})
+{{- if .EmptySuccess }}
+
+		if _, err := io.WriteString(w, "{}"); err != nil {
+			l.ErrorContext(ctx, "write error", slog.String("error", err.Error()))
+			return
+		}
+{{- end }}
 
 {{ if .RawBytesSuccess }}
 		if _, err := w.Write(res); err != nil {

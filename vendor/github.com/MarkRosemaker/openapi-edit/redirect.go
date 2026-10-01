@@ -2,6 +2,7 @@ package edit
 
 import (
 	"encoding/json/v2"
+	"maps"
 	"slices"
 
 	"github.com/MarkRosemaker/openapi"
@@ -37,30 +38,48 @@ import (
 //
 // [openapi-merge]: https://github.com/MarkRosemaker/openapi-merge
 func RedirectSchema(doc *openapi.Document, oldName, newName, description string) error {
+	return redirectSchemas(doc, map[string]string{oldName: newName}, description)
+}
+
+// RedirectSchemas is [RedirectSchema] for many schemas at once: it repoints every reference to each key of to at that
+// key's value, and removes the keys from components.schemas.
+//
+// It walks the document a fixed number of times however many schemas it redirects, where calling RedirectSchema for
+// each would walk it once per schema.
+//
+// A key redirected onto itself is left alone. Otherwise it fails, changing nothing, if a key or a value is not in
+// components.schemas, or if a value is itself redirected and so would not be there afterwards ([ErrSchemaNotFound]).
+func RedirectSchemas(doc *openapi.Document, to map[string]string) error {
+	return redirectSchemas(doc, to, "")
+}
+
+func redirectSchemas(doc *openapi.Document, to map[string]string, description string) error {
 	schemas := doc.Components.Schemas
 
-	if _, ok := schemas[oldName]; !ok {
-		return &ErrSchemaNotFound{Name: oldName}
+	for _, oldName := range slices.Sorted(maps.Keys(to)) {
+		if _, ok := schemas[oldName]; !ok {
+			return &ErrSchemaNotFound{Name: oldName}
+		}
+
+		newName := to[oldName]
+		next, redirected := to[newName]
+		if _, ok := schemas[newName]; !ok || redirected && next != newName {
+			return &ErrSchemaNotFound{Name: newName}
+		}
 	}
 
-	if _, ok := schemas[newName]; !ok {
-		return &ErrSchemaNotFound{Name: newName}
-	}
-
-	if oldName == newName {
+	to = withoutUnchanged(to)
+	if len(to) == 0 {
 		return nil
 	}
 
-	keepImplicitMappings(doc, schemas[oldName], oldName, newName)
-
-	old, new := schemaRefPrefix+oldName, schemaRefPrefix+newName
-
-	target := schemas[newName]
+	addImplicitMappings := implicitMappings(doc, to)
 
 	repointed := map[*openapi.Schema]bool{}
 
 	walkSchemas(doc, func(s *openapi.Schema) {
-		if s.Ref == nil || s.Ref.Identifier != old {
+		newName, ok := renamedRef(s, to)
+		if !ok {
 			return
 		}
 
@@ -68,28 +87,47 @@ func RedirectSchema(doc *openapi.Document, oldName, newName, description string)
 			s.Description = description
 		}
 
-		s.Ref.Identifier, s.Ref.Value = new, target
+		s.Ref.Identifier, s.Ref.Value = schemaRefPrefix+newName, schemas[newName]
 		repointed[s] = true
 	})
 
 	walkSchemas(doc, func(s *openapi.Schema) {
-		s.OneOf = dropDuplicateAlternatives(s.OneOf, new, repointed)
-		s.AnyOf = dropDuplicateAlternatives(s.AnyOf, new, repointed)
+		s.OneOf = dropDuplicateAlternatives(s.OneOf, repointed)
+		s.AnyOf = dropDuplicateAlternatives(s.AnyOf, repointed)
 	})
 
-	rewriteMappings(doc, oldName, newName)
+	rewriteMappings(doc, to)
+	addImplicitMappings()
 
-	delete(schemas, oldName)
+	for oldName := range to {
+		delete(schemas, oldName)
+	}
 
 	return nil
 }
 
-// dropDuplicateAlternatives keeps only the first of a union's alternatives that refer to ref and nothing else, once
-// redirecting has made more than one of them do so.
+// dropDuplicateAlternatives keeps only the first of a union's alternatives that refer to the same schema and nothing
+// else, once redirecting has made more than one of them do so.
 //
 // Two alternatives of the same schema are no alternative at all: a value that matches one matches the other, so a
 // oneOf could never hold for it.
-func dropDuplicateAlternatives(alts openapi.SchemaList, ref string, repointed map[*openapi.Schema]bool) openapi.SchemaList {
+func dropDuplicateAlternatives(alts openapi.SchemaList, repointed map[*openapi.Schema]bool) openapi.SchemaList {
+	var refs []string
+	for _, a := range alts {
+		if repointed[a] && !slices.Contains(refs, a.Ref.Identifier) {
+			refs = append(refs, a.Ref.Identifier)
+		}
+	}
+
+	for _, ref := range refs {
+		alts = dropDuplicateRefs(alts, ref)
+	}
+
+	return alts
+}
+
+// dropDuplicateRefs keeps only the first of alts that refers to ref and nothing else.
+func dropDuplicateRefs(alts openapi.SchemaList, ref string) openapi.SchemaList {
 	isRef := func(a *openapi.Schema) bool {
 		if a.Ref == nil || a.Ref.Identifier != ref {
 			return false
@@ -100,10 +138,6 @@ func dropDuplicateAlternatives(alts openapi.SchemaList, ref string, repointed ma
 		b, err := json.Marshal(&c)
 
 		return err == nil && string(b) == "{}"
-	}
-
-	if !slices.ContainsFunc(alts, func(a *openapi.Schema) bool { return repointed[a] }) {
-		return alts
 	}
 
 	i := slices.IndexFunc(alts, isRef)

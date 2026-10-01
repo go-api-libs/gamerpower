@@ -94,22 +94,27 @@ type URLParts struct {
 type Operation struct {
 	// BaseURL is set when the path item names a server of its own, overriding
 	// the document's for this operation only.
-	BaseURL         *URLParts `json:"baseURL,omitzero"`
-	Name            string    `json:"name,omitzero"`
-	Description     string    `json:"description,omitzero"`
-	Summary         string    `json:"summary,omitzero"`
-	Method          string    `json:"method,omitzero"`
-	PathTemplate    string    `json:"pathTemplate,omitzero"`
-	JoinPathArgs    []string  `json:"joinPathArgs,omitempty"`
-	PathParams      Params    `json:"pathParams,omitempty"`
-	QueryParams     Params    `json:"queryParams,omitempty"`
-	HeaderParams    Params    `json:"headerParams,omitempty"`
-	HasParams       bool      `json:"hasParams,omitzero"`
-	ParamStructName string    `json:"paramStructName,omitzero"`
-	RequestBody     *ReqBody  `json:"requestBody,omitempty"`
-	Responses       Responses `json:"responses,omitempty"`
-	SuccessReturn   *GoType   `json:"successReturn,omitempty"`
-	Deprecated      bool      `json:"deprecated,omitzero"`
+	BaseURL *URLParts `json:"baseURL,omitzero"`
+	// Auth is the scheme whose credential the operation sends, if any.
+	Auth            AuthScheme `json:"auth,omitzero"`
+	Name            string     `json:"name,omitzero"`
+	Description     string     `json:"description,omitzero"`
+	Summary         string     `json:"summary,omitzero"`
+	Method          string     `json:"method,omitzero"`
+	PathTemplate    string     `json:"pathTemplate,omitzero"`
+	JoinPathArgs    []string   `json:"joinPathArgs,omitempty"`
+	PathParams      Params     `json:"pathParams,omitempty"`
+	QueryParams     Params     `json:"queryParams,omitempty"`
+	HeaderParams    Params     `json:"headerParams,omitempty"`
+	HasParams       bool       `json:"hasParams,omitzero"`
+	ParamStructName string     `json:"paramStructName,omitzero"`
+	RequestBody     *ReqBody   `json:"requestBody,omitempty"`
+	Responses       Responses  `json:"responses,omitempty"`
+	SuccessReturn   *GoType    `json:"successReturn,omitempty"`
+	Deprecated      bool       `json:"deprecated,omitzero"`
+	// EmptySuccess is true when the operation's success body is an empty object: the client decodes it, so anything in
+	// it is an error, and returns no value; the server writes {}.
+	EmptySuccess bool `json:"emptySuccess,omitzero"`
 	// RawBytesSuccess is true when the operation's success response has no
 	// JSON media type, so SuccessReturn is a raw []byte read directly from
 	// the response body rather than a JSON-decoded type. Such operations
@@ -161,7 +166,39 @@ type Schema struct {
 	// the generated UnmarshalJSONFrom: exactly one variant must match for
 	// oneOf, at least one for anyOf.
 	UnionVariants []UnionVariant `json:"unionVariants,omitempty"`
-	IsOneOf       bool           `json:"isOneOf,omitzero"`
+	// Choices are what decoding a union picks from: its variants, or, for a variant that is a union of its own,
+	// each of that union's alternatives.
+	Choices []UnionVariant `json:"choices,omitempty"`
+	IsOneOf bool           `json:"isOneOf,omitzero"`
+	// IsTypeAlias declares the type as an alias of Type rather than a new type.
+	IsTypeAlias bool `json:"isTypeAlias,omitzero"`
+	// Discriminator is the member a union's variants are told apart by, if one is: the generated decoder reads it and
+	// decodes the one variant it names.
+	Discriminator string `json:"discriminator,omitzero"`
+	// AllOfUnion is the union among the parts of an allOf, held as a field of its own rather than embedded, since its
+	// methods would otherwise encode the whole struct.
+	AllOfUnion *AllOfUnion `json:"allOfUnion,omitzero"`
+	// Members are the JSON members an allOf's fields and embedded parts declare, outside its union.
+	Members []string `json:"members,omitempty"`
+	// Unimplemented says why encoding this type is not supported yet; its methods return an error saying so.
+	Unimplemented string `json:"unimplemented,omitzero"`
+	// Streamed is set for a union, or an allOf with a union part, that decodes as it reads: its discriminator comes
+	// first and picks the alternative, which then decodes each further member straight from the decoder.
+	Streamed bool `json:"streamed,omitzero"`
+	// MemberDecoder is set for a struct that decodes one member at a time, as an alternative of a streamed union.
+	MemberDecoder bool `json:"memberDecoder,omitzero"`
+}
+
+// AllOfUnion is the union part of an allOf.
+type AllOfUnion struct {
+	// FieldName is the field holding the union, named after its type.
+	FieldName string `json:"fieldName,omitzero"`
+	IsOneOf   bool   `json:"isOneOf,omitzero"`
+	// Discriminator is the member the variants are told apart by, if one is; otherwise by the members present.
+	Discriminator string         `json:"discriminator,omitzero"`
+	Variants      []UnionVariant `json:"variants,omitempty"`
+	// Choices are what decoding picks from, as for a union's Choices.
+	Choices []UnionVariant `json:"choices,omitempty"`
 }
 
 // SchemaKind categorizes a schema into struct, enum, or array alias.
@@ -184,6 +221,40 @@ type UnionVariant struct {
 	FieldName string `json:"fieldName,omitzero"`
 	// Type is the variant's own Go type, without the pointer the field adds.
 	Type string `json:"type,omitzero"`
+	// Value is the variant's value of the union's discriminator.
+	Value string `json:"value,omitzero"`
+	// Members and Required are the JSON members the variant declares and requires, if it is a plain Object.
+	Members  []string `json:"members,omitempty"`
+	Required []string `json:"required,omitempty"`
+	Object   bool     `json:"object,omitzero"`
+	// Path is set for a choice that is an alternative of a union nested in this one, however deep: the fields of the
+	// unions on the way to it, outermost first, each set to its union with the next one set.
+	Path []UnionStep `json:"path,omitempty"`
+}
+
+// UnionStep is a field holding a nested union, on the way to one of its alternatives.
+type UnionStep struct {
+	Field string `json:"field,omitzero"`
+	Type  string `json:"type,omitzero"`
+}
+
+// Assign returns the statement setting the union v holds to this choice, decoded into vv.
+func (c UnionVariant) Assign(v string) string {
+	if len(c.Path) == 0 {
+		return v + "." + c.FieldName + " = &vv"
+	}
+
+	value := "&vv"
+	for i, v := range slices.Backward(c.Path) {
+		field := c.FieldName
+		if i < len(c.Path)-1 {
+			field = c.Path[i+1].Field
+		}
+
+		value = "&" + v.Type + "{" + field + ": " + value + "}"
+	}
+
+	return v + "." + c.Path[0].Field + " = " + value
 }
 
 // Field is a named field within a struct schema.
@@ -266,8 +337,10 @@ type Param struct {
 	// the param back into an integer instead of an RFC 3339 string.
 	IsUnixTime  bool   `json:"isUnixTime,omitzero"`
 	Description string `json:"description,omitzero"`
-	Value       string `json:"value,omitzero"`   // hardcoded value, always the same
-	Example     string `json:"example,omitzero"` // hardcoded example for tests
+	// Item is one element of an array parameter, with v as its variable.
+	Item    *Param `json:"item,omitzero"`
+	Value   string `json:"value,omitzero"`   // hardcoded value, always the same
+	Example string `json:"example,omitzero"` // hardcoded example for tests
 }
 
 func (doc Document) APIKey() *Param {
@@ -295,10 +368,10 @@ type GoType struct {
 	IsPointer     bool   `json:"isPointer,omitzero"`
 	IsSlice       bool   `json:"isSlice,omitzero"`
 	IsArrayOfSize int    `json:"isArrayOfSize,omitzero"`
-	// IsNilable is true for a $ref to a named component schema that is
-	// itself array-kind (e.g. "type TimeEntries []TimeEntry"): Name is
-	// already a nilable Go type on its own, so Nilable returns it
-	// unchanged instead of adding a pointer.
+	// IsNilable is true for a map, or a $ref to a named component schema
+	// that is itself array- or map-kind (e.g. "type TimeEntries
+	// []TimeEntry"): Name is already a nilable Go type on its own, so
+	// Nilable returns it unchanged instead of adding a pointer.
 	IsNilable bool `json:"isNilable,omitzero"`
 }
 
@@ -379,7 +452,17 @@ type ReqBody struct {
 type Auth struct {
 	Bearer Bearer `json:"bearer,omitzero"`
 	Basic  Basic  `json:"basic,omitzero"`
+	// Default is the scheme operations use unless they name their own, so the client requires its credential.
+	Default AuthScheme `json:"default,omitzero"`
 }
+
+// AuthScheme names the credential an operation sends in its Authorization header.
+type AuthScheme string
+
+const (
+	AuthBearer AuthScheme = "bearer"
+	AuthBasic  AuthScheme = "basic"
+)
 
 type Bearer struct {
 	Name string `json:"name,omitzero"`
@@ -401,4 +484,11 @@ func (op Operation) BaseURLExpr() string {
 
 	return fmt.Sprintf("c.serverURL(&url.URL{Scheme: %q, Host: %q, Path: %q})",
 		op.BaseURL.Scheme, op.BaseURL.Host, cmp.Or(op.BaseURL.Path, "/"))
+}
+
+// NeedsJSONHelpers reports whether a generated type decodes its alternatives itself, needing the JSON helpers.
+func (doc Document) NeedsJSONHelpers() bool {
+	return slices.ContainsFunc(doc.Schemas, func(s Schema) bool {
+		return s.Discriminator != "" || s.AllOfUnion != nil && s.Unimplemented == "" || s.MemberDecoder
+	})
 }

@@ -3,6 +3,7 @@ package ir
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"net/url"
 	"slices"
 	"strings"
@@ -44,19 +45,25 @@ func FromDocument(doc *openapi.Document, packageName, userAgent string, producti
 		userAgent = doc.Info.Title
 	}
 
-	schemas, err := FromComponentSchemas(doc.Components.Schemas)
+	uses, err := countSchemaUses(doc)
+	if err != nil {
+		return nil, err
+	}
+
+	schemas, err := fromComponentSchemas(doc.Components.Schemas, uses)
 	if err != nil {
 		return nil, fmt.Errorf("components.schemas: %w", err)
 	}
 
-	auth := fromSecurity(doc.Components.SecuritySchemes, doc.Info.Title)
+	auth, schemes := fromSecurity(doc.Components.SecuritySchemes, doc.Info.Title)
+	auth.Default = defaultAuth(doc.Security, schemes, auth)
 
 	globalParamsMap, err := getGlobalParams(doc.Paths, doc.Info.Title)
 	if err != nil {
 		return nil, fmt.Errorf("getting global parameters: %w", err)
 	}
 
-	operations, err := fromPaths(doc.Paths, auth, globalParamsMap)
+	operations, err := fromPaths(doc.Paths, auth.Default, schemes, globalParamsMap)
 	if err != nil {
 		return nil, fmt.Errorf("paths: %w", err)
 	}
@@ -125,7 +132,7 @@ func parseServer(raw string) (URLParts, error) {
 }
 
 // fromPaths iterates all path items and operations, converting each to ir.Operation.
-func fromPaths(paths openapi.Paths, auth Auth, globalParams paramMap) ([]Operation, error) {
+func fromPaths(paths openapi.Paths, defaultAuth AuthScheme, schemes map[openapi.SecuritySchemeName]AuthScheme, globalParams paramMap) ([]Operation, error) {
 	var ops []Operation
 	for path, item := range paths.ByIndex() {
 		// A path item may name its own server: SEC serves one path from
@@ -148,6 +155,12 @@ func fromPaths(paths openapi.Paths, auth Auth, globalParams paramMap) ([]Operati
 			}
 
 			irOp.BaseURL = override
+			irOp.Auth = defaultAuth
+
+			if op.Security != nil {
+				irOp.Auth = requiredAuth(op.Security, schemes)
+			}
+
 			ops = append(ops, *irOp)
 		}
 	}
@@ -163,13 +176,16 @@ func fromPaths(paths openapi.Paths, auth Auth, globalParams paramMap) ([]Operati
 // A scheme's name field only means anything for type apiKey, where it names
 // the header, so an http scheme usually leaves it empty. Falling back
 // to the title matches how an API key parameter gets its own variable.
-func fromSecurity(schemes openapi.SecuritySchemes, apiTitle string) Auth {
+func fromSecurity(schemes openapi.SecuritySchemes, apiTitle string) (Auth, map[openapi.SecuritySchemeName]AuthScheme) {
 	s := Auth{}
+	byName := map[openapi.SecuritySchemeName]AuthScheme{}
 
-	for _, sec := range schemes {
+	for name, sec := range schemes {
 		v := sec.Value
 		switch v.Scheme {
 		case openapi.SecuritySchemeBearer:
+			byName[name] = AuthBearer
+
 			name := v.Name
 			if name == "" && apiTitle != "" {
 				name = strcase.ToSNAKE(fmt.Sprintf("%s_TOKEN", apiTitle))
@@ -177,6 +193,8 @@ func fromSecurity(schemes openapi.SecuritySchemes, apiTitle string) Auth {
 
 			s.Bearer = Bearer{Name: name}
 		case openapi.SecuritySchemeBasic:
+			byName[name] = AuthBasic
+
 			if apiTitle != "" {
 				s.Basic = Basic{
 					UsernameEnvName: strcase.ToSNAKE(fmt.Sprintf("%s_USERNAME", apiTitle)),
@@ -186,7 +204,34 @@ func fromSecurity(schemes openapi.SecuritySchemes, apiTitle string) Auth {
 		}
 	}
 
-	return s
+	return s, byName
+}
+
+// defaultAuth is the scheme the document's security requires, or without any, the one scheme it defines.
+func defaultAuth(security openapi.SecurityRequirements, schemes map[openapi.SecuritySchemeName]AuthScheme, auth Auth) AuthScheme {
+	switch {
+	case security != nil:
+		return requiredAuth(security, schemes)
+	case auth.Bearer.Name != "":
+		return AuthBearer
+	case auth.Basic.UsernameEnvName != "":
+		return AuthBasic
+	default:
+		return ""
+	}
+}
+
+// requiredAuth is the first scheme the client supports among the alternatives a security requirement lists.
+func requiredAuth(security openapi.SecurityRequirements, schemes map[openapi.SecuritySchemeName]AuthScheme) AuthScheme {
+	for _, req := range security {
+		for _, name := range slices.Sorted(maps.Keys(req)) {
+			if a, ok := schemes[name]; ok {
+				return a
+			}
+		}
+	}
+
+	return ""
 }
 
 type paramMap = ordmap.OrderedMap[*openapi.Parameter, Param]

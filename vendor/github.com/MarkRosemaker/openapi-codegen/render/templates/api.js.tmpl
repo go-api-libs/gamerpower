@@ -204,7 +204,11 @@ window.API = {
     {{.Name | camelCase}}: ({{- range $i, $p := .PathParams}}{{if $i}}, {{end}}{{$p.GoName}}{{end}}{{if .QueryParams}}{{if .PathParams}}, {{end}}params = {}{{end}}{{if .RequestBody}}{{if or .PathParams .QueryParams}}, {{end}}body{{end -}}) =>{{if .QueryParams}} {
         const q = new URLSearchParams();
         {{- range .QueryParams}}
+        {{- if .Item}}
+        for (const v of params.{{.GoName}} ?? []) q.append({{printf "%q" .JSONName}}, String(v));
+        {{- else}}
         if (params.{{.GoName}} != null) q.set({{printf "%q" .JSONName}}, String(params.{{.GoName}}));
+        {{- end}}
         {{- end}}
         return apiFetch(`{{.JSPathTemplate}}?${q}`, {
             {{- if ne .Method "GET"}}
