@@ -11,7 +11,7 @@ tool (
 
 require (
 	github.com/MarkRosemaker/jsonutil v0.0.0-20260929233335-a0222d53b745
-	github.com/MarkRosemaker/openapi-enrich v0.0.0-20260930040343-80d566776e63
+	github.com/MarkRosemaker/openapi-enrich v0.0.0-20261001204237-f6c87cd4ba08
 	github.com/go-api-libs/api v0.0.0-20260929233335-2095d151ac30
 )
 
@@ -19,13 +19,13 @@ require (
 	cloud.google.com/go v0.123.0 // indirect
 	github.com/MarkRosemaker/errpath v0.0.0-20260929233333-1f3585d128eb // indirect
 	github.com/MarkRosemaker/json2yaml v0.0.0-20260929233333-5bd09fe72975 // indirect
-	github.com/MarkRosemaker/openapi v0.0.0-20260929233434-4906b8f820e0 // indirect
+	github.com/MarkRosemaker/openapi v0.0.0-20261001203346-42d50de94f07 // indirect
 	github.com/MarkRosemaker/openapi-codegen v0.0.0-20260927220743-e5e409cd34eb // indirect
-	github.com/MarkRosemaker/openapi-compare v0.0.0-20260930040218-2be37b91d30d // indirect
-	github.com/MarkRosemaker/openapi-compress v0.0.0-20260929234906-cfbb08493ad5 // indirect
-	github.com/MarkRosemaker/openapi-edit v0.0.0-20260930040218-4edbc1bc701e // indirect
-	github.com/MarkRosemaker/openapi-flatten v0.0.0-20261001121226-0164a1bb2b26 // indirect
-	github.com/MarkRosemaker/openapi-merge v0.0.0-20260929233521-27a48decf2fe // indirect
+	github.com/MarkRosemaker/openapi-compare v0.0.0-20261001204032-fc8c08b1df9d // indirect
+	github.com/MarkRosemaker/openapi-compress v0.0.0-20261001131339-db9c02264f04 // indirect
+	github.com/MarkRosemaker/openapi-edit v0.0.0-20261001204032-cfbbb072dfd7 // indirect
+	github.com/MarkRosemaker/openapi-flatten v0.0.0-20261001204140-28f347331ad6 // indirect
+	github.com/MarkRosemaker/openapi-merge v0.0.0-20261001204032-a7db179ce542 // indirect
 	github.com/MarkRosemaker/ordmap v0.0.0-20260929233348-fabf15af2b14 // indirect
 	github.com/MarkRosemaker/yaml v0.0.0-20260929233352-7d1e6061a63c // indirect
 	github.com/MarkRosemaker/yaml2json v0.0.0-20260929233333-2e4b34c28c94 // indirect

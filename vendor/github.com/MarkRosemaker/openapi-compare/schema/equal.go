@@ -77,8 +77,7 @@ func sameCore(
 		a.MinLength == b.MinLength &&
 		ptrsEqual(a.MaxLength, b.MaxLength) &&
 		regexpsEqual(a.Pattern, b.Pattern) &&
-		slices.EqualFunc(a.Enum, b.Enum,
-			func(c, d jsontext.Value) bool { return bytes.Equal(c, d) }) &&
+		enumsEqual(a.Enum, b.Enum) &&
 		bytes.Equal(a.Const, b.Const) &&
 		a.MinItems == b.MinItems &&
 		ptrsEqual(a.MaxItems, b.MaxItems) &&
@@ -94,6 +93,13 @@ func sameCore(
 		a.ContentMediaType == b.ContentMediaType &&
 		a.ContentEncoding == b.ContentEncoding &&
 		bytes.Equal(a.Extensions, b.Extensions)
+}
+
+// enumsEqual reports whether a and b allow the same values. An absent enum allows any value and an empty one none,
+// so the two differ although both hold no values.
+func enumsEqual(a, b []jsontext.Value) bool {
+	return (a == nil) == (b == nil) &&
+		slices.EqualFunc(a, b, func(c, d jsontext.Value) bool { return bytes.Equal(c, d) })
 }
 
 // refsEqual reports whether a and b are both absent or point to the same place.

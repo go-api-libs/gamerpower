@@ -12,7 +12,7 @@
 		"schema",
 		"swagger"
 	],
-	"coverage": 70,
-	"devtoolVersion": "v0.0.0-20260929233704-b7f506df5126",
+	"coverage": 70.5,
+	"devtoolVersion": "v0.0.0-20261001132508-cd1921adc74c",
 	"kind": "cli"
 }
