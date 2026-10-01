@@ -23,12 +23,12 @@ func parameter(d *openapi.Document, p *openapi.Parameter) error {
 	paramName := strcase.ToGoPascal(p.Name)
 
 	if p.Schema != nil {
-		if err := inlineSchema(d, p.Schema, paramName, moveIfNecessary); err != nil {
+		if err := inlineSchema(d, p.Schema, paramName, false); err != nil {
 			return &errpath.ErrField{Field: "schema", Err: err}
 		}
 	}
 
-	if err := content(d, p.Content, paramName, "Parameter", moveIfNecessary); err != nil {
+	if err := content(d, p.Content, paramName, "Parameter", false); err != nil {
 		return &errpath.ErrField{Field: "content", Err: err}
 	}
 

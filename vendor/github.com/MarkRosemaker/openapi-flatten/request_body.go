@@ -11,7 +11,7 @@ func nameRequestBody(opID string) string {
 }
 
 func requestBody(d *openapi.Document, r *openapi.RequestBody, reqBodyName string) error {
-	if err := content(d, r.Content, reqBodyName, "RequestBody", moveIfNecessary); err != nil {
+	if err := content(d, r.Content, reqBodyName, "RequestBody", false); err != nil {
 		return &errpath.ErrField{Field: "content", Err: err}
 	}
 

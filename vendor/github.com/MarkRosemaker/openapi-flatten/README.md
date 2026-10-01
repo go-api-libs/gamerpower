@@ -88,7 +88,11 @@ Inline schemas are moved to `components/schemas` when they contain meaningful st
 - a **string** or **array of strings** with `enum` values
 - an **array of objects**
 
-The alternatives of a `oneOf` or `anyOf` are moved by the same rules, so each shaped alternative gets a name of its own, and so are the schema of an object's keys (`propertyNames`) and the schema a value must not match (`not`). Schemas inside `allOf` are never moved because they exist solely to compose a larger type.
+The entries of an `allOf` and the alternatives of a `oneOf` or `anyOf` are moved by
+the same rules, so each shaped one gets a name of its own, and so are the schema of
+an object's keys (`propertyNames`) and the schema a value must not match (`not`). An
+`allOf` thus ends up as a list of references, plus any entry with no shape of its own,
+such as `{"required": ["id"]}`.
 
 **Before:**
 
@@ -97,8 +101,10 @@ The alternatives of a `oneOf` or `anyOf` are moved by the same rules, so each sh
   "paths": {
     "/pets": {
       "post": {
+        "operationId": "createPet",
         "responses": {
           "400": {
+            "description": "Bad request",
             "content": {
               "application/json": {
                 "schema": {
@@ -124,9 +130,10 @@ The alternatives of a `oneOf` or `anyOf` are moved by the same rules, so each sh
   "paths": {
     "/pets": {
       "post": {
+        "operationId": "createPet",
         "responses": {
           "400": {
-            "$ref": "#/components/responses/CreatePetBadRequestResponse"
+            "$ref": "#/components/responses/CreatePetBadRequest"
           }
         }
       }
@@ -134,18 +141,19 @@ The alternatives of a `oneOf` or `anyOf` are moved by the same rules, so each sh
   },
   "components": {
     "responses": {
-      "CreatePetBadRequestResponse": {
+      "CreatePetBadRequest": {
+        "description": "Bad request",
         "content": {
           "application/json": {
             "schema": {
-              "$ref": "#/components/schemas/CreatePetBadRequestJsonResponse"
+              "$ref": "#/components/schemas/CreatePetBadRequest"
             }
           }
         }
       }
     },
     "schemas": {
-      "CreatePetBadRequestJsonResponse": {
+      "CreatePetBadRequest": {
         "type": "object",
         "properties": {
           "error": { "type": "string" }
@@ -158,25 +166,30 @@ The alternatives of a `oneOf` or `anyOf` are moved by the same rules, so each sh
 
 ### Responses
 
-Every inline response object is moved to `components/responses`. The generated name combines the operation ID, the HTTP status text, and the suffix `Response`:
+Every inline response object is moved to `components/responses`. The generated name combines the operation ID and the HTTP status text:
 
 ```
-{OperationID}{StatusText}Response
+{OperationID}{StatusText}
 ```
 
-Examples: `CreatePetBadRequestResponse`, `GetMeUnauthorizedResponse`.
+Examples: `CreatePetBadRequest`, `GetMeUnauthorized`.
 
-Error responses (status ≥ 400) always have their schemas promoted to components. Success responses only promote complex schemas.
+The schema of a response's content takes the same name in `components/schemas`, unless
+it has a `title`. The two sections keep them apart, so neither needs a suffix. Every
+response other than a success (`2XX`) always has its schema promoted to components;
+a success response only promotes a complex schema.
 
 ### Request bodies
 
-Inline request bodies are moved to `components/requestBodies`. The generated name is:
+Inline request bodies are moved to `components/requestBodies`, named after the
+operation ID alone:
 
 ```
-{OperationID}RequestBody
+{OperationID}
 ```
 
-Example: `CreatePetRequestBody`.
+Example: `CreatePet`. Its schema takes the same name in `components/schemas`, unless it
+has a `title`.
 
 ### Parameters
 
@@ -194,9 +207,9 @@ repeating themselves.
 
 ## Name generation
 
-All names are converted to Go-style PascalCase (e.g., `create pet bad request response` → `CreatePetBadRequestResponse`). If the generated name is already taken, a numeric suffix is appended (`Name2`, `Name3`, …) to avoid collisions.
+All names are converted to Go-style PascalCase (e.g., `create pet bad request` → `CreatePetBadRequest`). If the generated name is already taken, a numeric suffix is appended (`Name2`, `Name3`, …) to avoid collisions.
 
-A `oneOf` or `anyOf` alternative is named by its `title` if it has one (`"A person"` → `APerson`), and otherwise by its parent, the keyword and its position (`PetOneOf1`). The schema of an object's keys is named after the object plus `Key` (`PetKey`), and a `not` schema plus `Not` (`PetNot`).
+An `allOf` entry is named by its parent, the keyword and its position (`PetAllOf1`). A `oneOf` or `anyOf` alternative is named by its `title` if it has one (`"A person"` → `APerson`), and otherwise the same way (`PetOneOf1`). The schema of an object's keys is named after the object plus `Key` (`PetKey`), and a `not` schema plus `Not` (`PetNot`).
 
 ## Error reporting
 

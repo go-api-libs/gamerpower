@@ -20,13 +20,13 @@ func nameMediaType(rspOrReqBodyName, nameMediaRange string,
 	}, " "))
 }
 
-func mediaType(d *openapi.Document, mt *openapi.MediaType, mtName string, modeSchema mode) error {
+func mediaType(d *openapi.Document, mt *openapi.MediaType, mtName string, alwaysMove bool) error {
 	if mt.Schema != nil {
 		if title := mt.Schema.Title; title != "" {
 			mtName = strcase.ToGoPascal(title)
 		}
 
-		if err := inlineSchema(d, mt.Schema, mtName, modeSchema); err != nil {
+		if err := inlineSchema(d, mt.Schema, mtName, alwaysMove); err != nil {
 			return &errpath.ErrField{Field: "schema", Err: err}
 		}
 	}
