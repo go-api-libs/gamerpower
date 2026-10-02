@@ -1,6 +1,7 @@
 package compress
 
 import (
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -173,7 +174,8 @@ func uniqueName(candidate, currentName string, existing openapi.Schemas) string 
 // shortenMergedSchemaNames renames each schema in targets to a shorter name.
 // targets is the set of schema names that acted as canonical during at least
 // one merge pass.  Schemas that were themselves merged away are silently
-// skipped.  Names are processed in sorted order for determinism.
+// skipped.  Names are chosen in sorted order for determinism, each one seeing
+// the names chosen before it, and the schemas are then renamed together.
 func shortenMergedSchemaNames(d *openapi.Document, targets map[string]bool) error {
 	names := make([]string, 0, len(targets))
 	for name := range targets {
@@ -182,20 +184,31 @@ func shortenMergedSchemaNames(d *openapi.Document, targets map[string]bool) erro
 
 	sort.Strings(names)
 
+	existing := maps.Clone(d.Components.Schemas)
+	to := map[string]string{}
+	original := map[string]string{} // a name chosen here, to the schema's name in d
+
 	for _, name := range names {
-		if _, ok := d.Components.Schemas[name]; !ok {
+		s, ok := existing[name]
+		if !ok {
 			continue // merged away in a later pass
 		}
 
-		short := shortName(name, d.Components.Schemas)
+		short := shortName(name, existing)
 		if short == name {
 			continue
 		}
 
-		if err := edit.RenameSchema(d, name, short); err != nil {
-			return err
+		from, renamed := original[name]
+		if !renamed {
+			from = name
 		}
+
+		delete(existing, name)
+		existing[short] = s
+		to[from] = short
+		original[short] = from
 	}
 
-	return nil
+	return edit.RenameSchemas(d, to)
 }

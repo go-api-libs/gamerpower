@@ -86,21 +86,31 @@ func deduplicateSchemasAtThreshold(d *openapi.Document, threshold float64) (map[
 		return isBareScalar(schemas[name])
 	})
 
+	// the loop below runs over every pair, so it looks schemas up by position rather than by name
+	list := make([]*openapi.Schema, len(names))
+	keys := make([]string, len(names))
+	for i, name := range names {
+		list[i] = schemas[name]
+		keys[i] = shapeKey(list[i])
+	}
+
+	removed := make([]bool, len(names))
+
 	// replacements maps a name-to-remove to its canonical name.
 	replacements := map[string]string{}
 
-	for i, nameA := range names {
-		if _, removed := replacements[nameA]; removed {
+	for i, schemaA := range list {
+		if removed[i] {
 			continue
 		}
 
-		schemaA := schemas[nameA]
-		for _, nameB := range names[i+1:] {
-			if _, removed := replacements[nameB]; removed {
+		for j := i + 1; j < len(list); j++ {
+			schemaB := list[j]
+
+			// only two objects with properties can be similar without having the same shape
+			if removed[j] || keys[i] != keys[j] && (threshold >= 1.0 || !hasProperties(schemaA) || !hasProperties(schemaB)) {
 				continue
 			}
-
-			schemaB := schemas[nameB]
 
 			var sim float64
 			if threshold >= 1.0 {
@@ -109,17 +119,11 @@ func deduplicateSchemasAtThreshold(d *openapi.Document, threshold float64) (map[
 					sim = 1.0
 				}
 			} else {
-				// Size bound: max possible Jaccard = min(|a|,|b|) / max(|a|,|b|).
-				// If that bound is already below the threshold, skip the expensive
-				// similarity computation.
-				pa, pb := len(schemaA.Properties), len(schemaB.Properties)
-				if pa > 0 && pb > 0 {
-					lo, hi := pa, pb
-					if lo > hi {
-						lo, hi = hi, lo
-					}
-
-					if float64(lo)/float64(hi) < threshold {
+				// Every property in only one schema scores nothing, so if the shared names alone are too few, skip the
+				// expensive similarity computation.
+				if pa, pb := len(schemaA.Properties), len(schemaB.Properties); pa > 0 && pb > 0 {
+					shared := sharedNames(schemaA.Properties, schemaB.Properties)
+					if float64(shared)/float64(pa+pb-shared) < threshold {
 						continue
 					}
 				}
@@ -138,7 +142,8 @@ func deduplicateSchemasAtThreshold(d *openapi.Document, threshold float64) (map[
 
 			fillExamples(schemaA, schemaB)
 
-			replacements[nameB] = nameA
+			removed[j] = true
+			replacements[names[j]] = names[i]
 		}
 	}
 
@@ -152,17 +157,8 @@ func deduplicateSchemasAtThreshold(d *openapi.Document, threshold float64) (map[
 		canonicals[canonical] = true
 	}
 
-	removed := make([]string, 0, len(replacements))
-	for name := range replacements {
-		removed = append(removed, name)
-	}
-
-	sort.Strings(removed)
-
-	for _, name := range removed {
-		if err := edit.RedirectSchema(d, name, replacements[name], ""); err != nil {
-			return nil, err
-		}
+	if err := edit.RedirectSchemas(d, replacements); err != nil {
+		return nil, err
 	}
 
 	return canonicals, nil
@@ -307,4 +303,42 @@ func isBareScalar(s *openapi.Schema) bool {
 	b, err := json.Marshal(&c)
 
 	return err == nil && string(b) == "{}"
+}
+
+// shapeKey is the same for any two schemas of the same shape (see schema.SameShape), and cheap to compare.
+func shapeKey(s *openapi.Schema) string {
+	var b strings.Builder
+
+	b.WriteString(string(s.Type))
+
+	if s.Ref != nil {
+		b.WriteString(s.Ref.Identifier)
+	}
+
+	for _, name := range sortedSchemaNames(s.Properties) {
+		b.WriteString("|" + name)
+	}
+
+	return b.String()
+}
+
+func hasProperties(s *openapi.Schema) bool {
+	return s.Type == openapi.TypeObject && len(s.Properties) > 0
+}
+
+// sharedNames counts the property names a and b have in common.
+func sharedNames(a, b openapi.Schemas) int {
+	if len(a) > len(b) {
+		a, b = b, a
+	}
+
+	n := 0
+
+	for name := range a {
+		if _, ok := b[name]; ok {
+			n++
+		}
+	}
+
+	return n
 }
