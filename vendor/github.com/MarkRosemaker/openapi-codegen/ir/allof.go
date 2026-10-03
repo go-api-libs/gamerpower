@@ -249,7 +249,7 @@ func fieldVariants(variants openapi.SchemaList) ([]UnionVariant, []*openapi.Sche
 
 		used[fieldName] = true
 
-		uv := UnionVariant{FieldName: fieldName, Type: tp.String()}
+		uv := UnionVariant{FieldName: fieldName, Type: tp.String(), Zero: unsetValue(v, tp)}
 		uv.Members, uv.Required, uv.Object = objectShape(v)
 		out = append(out, uv)
 		schemas = append(schemas, v)
@@ -557,4 +557,24 @@ func markStreaming(schemas []Schema) {
 			}
 		}
 	}
+}
+
+// unsetValue is what the field of the union alternative v, of Go type tp, holds while it is not set, if that needs no
+// pointer: nil for a slice or a map, and "" for a string, so an empty string reads as not set. It is empty if the field
+// is a pointer instead.
+func unsetValue(v *openapi.Schema, tp *GoType) string {
+	switch {
+	case tp.IsPointer || tp.IsArrayOfSize > 0:
+		return ""
+	case tp.IsSlice || tp.IsNilable || tp.Name == "any" || strings.HasPrefix(tp.Name, "map["):
+		return "nil"
+	}
+
+	if s := deref(v); s != nil && s.Type == openapi.TypeString {
+		if st, err := stringGoType(s.Format); err == nil && (st.Name == "string" || st.Name == "types.Email") {
+			return `""`
+		}
+	}
+
+	return ""
 }

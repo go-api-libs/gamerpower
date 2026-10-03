@@ -219,8 +219,11 @@ type UnionVariant struct {
 	// FieldName is the exported Go field name, derived from the variant's
 	// resolved type name (e.g. "Card" for a field of type *Card).
 	FieldName string `json:"fieldName,omitzero"`
-	// Type is the variant's own Go type, without the pointer the field adds.
+	// Type is the variant's own Go type, without the pointer the field may add.
 	Type string `json:"type,omitzero"`
+	// Zero is the value the field holds while the variant is not set, if Type has one no variant can take: nil for a
+	// slice or a map, "" for a string. The field then is Type itself; otherwise it is a pointer to Type, nil until set.
+	Zero string `json:"zero,omitzero"`
 	// Value is the variant's value of the union's discriminator.
 	Value string `json:"value,omitzero"`
 	// Members and Required are the JSON members the variant declares and requires, if it is a plain Object.
@@ -239,12 +242,30 @@ type UnionStep struct {
 }
 
 // Assign returns the statement setting the union v holds to this choice, decoded into vv.
-func (c UnionVariant) Assign(v string) string {
-	if len(c.Path) == 0 {
-		return v + "." + c.FieldName + " = &vv"
+// FieldType is the Go type of the variant's field.
+func (c UnionVariant) FieldType() string {
+	if c.Zero != "" {
+		return c.Type
 	}
 
+	return "*" + c.Type
+}
+
+// IsSet is the Go expression that reports whether field, the variant's field, is set.
+func (c UnionVariant) IsSet(field string) string {
+	return field + " != " + cmp.Or(c.Zero, "nil")
+}
+
+func (c UnionVariant) Assign(v string) string {
 	value := "&vv"
+	if c.Zero != "" {
+		value = "vv"
+	}
+
+	if len(c.Path) == 0 {
+		return v + "." + c.FieldName + " = " + value
+	}
+
 	for i, v := range slices.Backward(c.Path) {
 		field := c.FieldName
 		if i < len(c.Path)-1 {

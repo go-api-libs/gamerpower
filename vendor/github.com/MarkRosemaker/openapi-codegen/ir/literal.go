@@ -42,11 +42,23 @@ func (doc Document) minimalLiteral(goType string, seen map[string]bool) (string,
 
 		v := s.UnionVariants[0]
 
-		lit, set := doc.minimalLiteral(v.Type, seen)
-		if !set {
-			lit = "new(" + v.Type + ")"
-		} else {
-			lit = "&" + lit
+		var lit string
+
+		switch v.Zero {
+		case "":
+			l, set := doc.minimalLiteral(v.Type, seen)
+			if set {
+				lit = "&" + l
+			} else {
+				lit = "new(" + v.Type + ")"
+			}
+		case `""`:
+			lit = `"-"` // any but the empty string, which reads as not set
+		default:
+			lit = v.Type + "{}" // empty, but not nil
+			if v.Type == "any" {
+				lit = "struct{}{}"
+			}
 		}
 
 		parts = append(parts, v.FieldName+": "+lit)

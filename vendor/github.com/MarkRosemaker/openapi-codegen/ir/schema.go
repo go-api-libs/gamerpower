@@ -163,15 +163,15 @@ func nullableVariant(s *openapi.Schema) *openapi.Schema {
 	}
 }
 
-// nullableGoType is the Go type of X or null: a pointer to X, unless X's own nil already means null.
+// nullableGoType is the Go type of X or null: a pointer to X if its zero value is a value of its own, or X itself.
 func nullableGoType(v *openapi.Schema) (*GoType, error) {
 	tp, err := SchemaGoType(v)
 	if err != nil {
 		return nil, err
 	}
 
-	if !tp.IsSlice && !tp.IsNilable && tp.IsArrayOfSize == 0 && tp.Name != "any" &&
-		!strings.HasPrefix(tp.Name, "map[") {
+	// null otherwise reads as the zero value, which is all it needs to be when that is no value of X
+	if zeroIsAValue(v, tp) {
 		tp.IsPointer = true
 	}
 
@@ -325,6 +325,7 @@ func fromComponentSchemas(schemas openapi.Schemas, uses map[string]int) ([]Schem
 		}
 	}
 
+	pointRecursiveFields(kept)
 	markStreaming(kept)
 
 	return kept, nil
@@ -498,18 +499,8 @@ func getField(jsonName string, propRef *openapi.Schema, requiredSet map[string]b
 	v := deref(propRef)
 
 	required := requiredSet[jsonName]
-	if !required {
-		switch v.Type {
-		case openapi.TypeBoolean, openapi.TypeArray:
-		case openapi.TypeString:
-			switch v.Format {
-			case openapi.FormatURI, openapi.FormatUUID:
-				goType.IsPointer = true
-			default:
-			}
-		default:
-			goType.IsPointer = true
-		}
+	if !required && zeroIsAValue(propRef, goType) {
+		goType.IsPointer = true
 	}
 
 	fieldName := fieldGoName(jsonName)
@@ -521,7 +512,7 @@ func getField(jsonName string, propRef *openapi.Schema, requiredSet map[string]b
 		Name:            fieldName,
 		JSONName:        jsonName,
 		Type:            goType.String(),
-		JSONTag:         buildJSONTag(jsonName, v.Type, v.Format, required),
+		JSONTag:         buildJSONTag(jsonName, required),
 		Description:     cmp.Or(propRef.Description, v.Description),
 		Required:        required,
 		IsDateTimeOrInt: isDateTimeOrIntegerOneOf(v),
@@ -836,54 +827,18 @@ func digitWord(r rune) string {
 
 // buildJSONTag computes the json struct tag for a field.
 //
-// Rules (mirroring the apilib reference):
-//   - plain string, required:     json:"name"
-//   - plain string, optional:     json:"name"       (empty strings are valid values)
-//   - array:                      json:"name,omitempty"
-//   - other, required:            json:"name"        (a required field must always be sent,
-//     zero value included -- omitzero would silently drop e.g. a required "false" or "0")
-//   - other, optional:            json:"name,omitempty"
-func buildJSONTag(jsonName string, tp openapi.DataType, format openapi.Format, required bool) string {
-	// NOTE: JSON tags need to be rethought;
-	// ideally, we want to not marshal unnecessarily
-	// at the same time, sometimes we need to marshal null to delete values
-	// we may need to decide based on custom x- tags in the openapi spec
-	var opts string
-	switch tp {
-	case openapi.TypeString:
-		switch format {
-		case "": // regular string
-			opts = ",omitzero"
-		default:
-			// NOTE: copied from legacy code, might not make sense
-			if required {
-				opts = ",omitzero"
-			} else {
-				opts = ",omitempty"
-			}
-		}
-	case openapi.TypeArray:
-		// omitempty would drop an initialised-but-empty slice, so a required
-		// array could never be sent as []. omitzero drops only a nil slice,
-		// leaving the sender to choose: nil omits the field, []T{} sends [].
-		// If the array is required, we do not have any tags.
-		if !required {
-			opts = ",omitzero"
-		}
-	case openapi.TypeBoolean, openapi.TypeInteger:
-		// A required field must always be sent, zero value included: a
-		// required boolean that happens to be false, or a required count of
-		// 0, is a real value, not an absence to omit.
-		if !required {
-			opts = ",omitempty"
-		}
-	default:
-		if !required {
-			opts = ",omitempty"
-		}
+// An optional field is omitted when it holds its zero value, which is how a caller leaves it unset: nil for a pointer,
+// a map or a slice, so an empty one is still sent. omitempty would not do: encoding/json/v2 omits with it only what
+// encodes as an empty JSON value, so an unset time, number or boolean would still be sent, as "0001-01-01T00:00:00Z",
+// 0 or false.
+//
+// A required field is always sent, zero value included: a required "", false or 0 is a real value.
+func buildJSONTag(jsonName string, required bool) string {
+	if required {
+		return fmt.Sprintf(`json:"%s"`, jsonName)
 	}
 
-	return fmt.Sprintf(`json:"%s%s"`, jsonName, opts)
+	return fmt.Sprintf(`json:"%s,omitzero"`, jsonName)
 }
 
 // deref is the schema s stands for: the one it refers to, if it is a reference.

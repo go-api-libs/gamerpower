@@ -68,12 +68,10 @@ func Generate(cfg Config) error {
 		return fmt.Errorf("invalid spec given: %w", err)
 	}
 
-	irDoc, err := ir.FromDocument(cfg.Spec, cfg.PackageName, cfg.UserAgent, cfg.Production)
+	irDoc, err := ir.FromDocument(cfg.Spec, cfg.PackageName, cfg.UserAgent, cfg.Production, cfg.Debug)
 	if err != nil {
 		return fmt.Errorf("build IR: %w", err)
 	}
-
-	irDoc.Debug = cfg.Debug
 
 	if len(cfg.Interactions) > 0 {
 		if err := matchInteractions(irDoc, cfg.Interactions); err != nil {

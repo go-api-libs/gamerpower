@@ -16,14 +16,19 @@ import (
 )
 
 // FromDocument converts a fully-loaded and flattened openapi.Document to an IR Document.
-// cfg provides the package name and optional user-agent override.
-func FromDocument(doc *openapi.Document, packageName, userAgent string, production bool) (*Document, error) {
+// cfg provides the package name and optional user-agent override. In debug mode, nothing the specification leaves
+// open decodes into any: see narrowUnspecified.
+func FromDocument(doc *openapi.Document, packageName, userAgent string, production, debug bool) (*Document, error) {
 	if err := flatten.Document(doc); err != nil {
 		return nil, fmt.Errorf("flatten: %w", err)
 	}
 
 	if err := compress.Document(doc, compress.Config{}); err != nil {
 		return nil, fmt.Errorf("compress: %w", err)
+	}
+
+	if debug {
+		narrowUnspecified(doc)
 	}
 
 	// sort the components and responses
@@ -90,6 +95,7 @@ func FromDocument(doc *openapi.Document, packageName, userAgent string, producti
 
 	return &Document{
 		Title:                  title,
+		Debug:                  debug,
 		Production:             production,
 		PackageName:            packageName,
 		BaseURL:                baseURL,

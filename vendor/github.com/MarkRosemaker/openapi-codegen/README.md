@@ -54,9 +54,10 @@ the `error` interface or a Go keyword are renamed.
 
 How the specification maps onto Go:
 
-- **Unions** — a `oneOf` or `anyOf` becomes a struct with one pointer field per
+- **Unions** — a `oneOf` or `anyOf` becomes a struct with one field per
   alternative, exactly one (`oneOf`) or at least one (`anyOf`) of them set after
-  decoding. An alternative that is only `null` needs no field. Where a member tells
+  decoding. A field is a pointer, nil until set, unless its zero value already
+  says it is not set: nil for a slice or a map, `""` for a string. An alternative that is only `null` needs no field. Where a member tells
   the alternatives apart (the `discriminator`'s `propertyName`, or a member each
   alternative fixes to a string of its own, such as Notion's `type`), that member
   must come first: decoding reads it, and the alternative it names decodes each
@@ -76,8 +77,26 @@ How the specification maps onto Go:
   locating it in the input; an unknown member wraps `json.ErrUnknownName`. A case
   that could be supported but has no real example yet, such as an `allOf` of two
   unions, is generated with methods that return an "unimplemented" error.
+- **Debug mode** — with `-debug`, a client given `WithDebug` records each
+  response it fails to decode to `api/interactions.json`, for `openapi-enrich` to
+  learn from. Nothing the specification leaves open decodes into `any` then: the
+  empty schema, an array without `items`, a free-form object and `not` alone
+  become `struct{}`, so any value in them fails and is recorded.
+- **Fields** — a field is a pointer only where its zero value must be told apart
+  from something else: from leaving the field out, if it is optional, or from
+  null, if it is nullable. That is a boolean, a number that may be 0, or an object
+  that requires nothing, so `{}` says something; nil then leaves the field out,
+  and a pointer to the zero value sends it. A zero value the specification makes
+  the default, or rules out with a bound or an enum, needs no pointer. A string,
+  a time, a slice, a map or a union is never a pointer: its zero value leaves it
+  out. A struct that would contain itself refers to itself through a pointer.
+- **Omitting** — an optional field is tagged `omitzero`, so it is left out while
+  it holds its zero value: nil for a pointer, a slice or a map, so an empty one
+  is still sent. A required field is always sent, `""`, `0` and `false`
+  included.
 - **Null** — a schema that is only ever `null` is `*struct{}`, and "X or null"
-  is `*X`, or plain `X` where `X` is already nilable (a slice, a map, `any`).
+  is `X`, a pointer to `X` only by the rule for fields above, so that null and
+  the zero value can differ.
 - **Query parameters** — an array is sent as one value per element (form style,
   exploded). "X or an array of X" is sent as the array, a union of strings as a
   string, and `null` is dropped, since a query string cannot carry it.
