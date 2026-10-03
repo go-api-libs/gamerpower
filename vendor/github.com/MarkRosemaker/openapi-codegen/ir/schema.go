@@ -5,6 +5,7 @@ import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"fmt"
+	"go/token"
 	"regexp"
 	"strconv"
 	"strings"
@@ -433,7 +434,11 @@ func unionVariantFieldName(t *GoType, index int) string {
 		name = "map of " + strings.TrimPrefix(name, "map[string]")
 	}
 
-	name = strcase.ToGoPascal(name)
+	// a type's own exported name is kept as it is, which Go-style casing could change, such as URL2 to Url2
+	if !isExported(name) || !token.IsIdentifier(name) {
+		name = strcase.ToGoPascal(name)
+	}
+
 	if name == "" {
 		name = fmt.Sprintf("Variant%d", index+1)
 	}

@@ -3,7 +3,9 @@ package ir
 import (
 	"cmp"
 	"fmt"
+	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -96,22 +98,24 @@ type Operation struct {
 	// the document's for this operation only.
 	BaseURL *URLParts `json:"baseURL,omitzero"`
 	// Auth is the scheme whose credential the operation sends, if any.
-	Auth            AuthScheme `json:"auth,omitzero"`
-	Name            string     `json:"name,omitzero"`
-	Description     string     `json:"description,omitzero"`
-	Summary         string     `json:"summary,omitzero"`
-	Method          string     `json:"method,omitzero"`
-	PathTemplate    string     `json:"pathTemplate,omitzero"`
-	JoinPathArgs    []string   `json:"joinPathArgs,omitempty"`
-	PathParams      Params     `json:"pathParams,omitempty"`
-	QueryParams     Params     `json:"queryParams,omitempty"`
-	HeaderParams    Params     `json:"headerParams,omitempty"`
-	HasParams       bool       `json:"hasParams,omitzero"`
-	ParamStructName string     `json:"paramStructName,omitzero"`
-	RequestBody     *ReqBody   `json:"requestBody,omitempty"`
-	Responses       Responses  `json:"responses,omitempty"`
-	SuccessReturn   *GoType    `json:"successReturn,omitempty"`
-	Deprecated      bool       `json:"deprecated,omitzero"`
+	Auth         AuthScheme `json:"auth,omitzero"`
+	Name         string     `json:"name,omitzero"`
+	Description  string     `json:"description,omitzero"`
+	Summary      string     `json:"summary,omitzero"`
+	Method       string     `json:"method,omitzero"`
+	PathTemplate string     `json:"pathTemplate,omitzero"`
+	JoinPathArgs []string   `json:"joinPathArgs,omitempty"`
+	PathParams   Params     `json:"pathParams,omitempty"`
+	QueryParams  Params     `json:"queryParams,omitempty"`
+	HeaderParams Params     `json:"headerParams,omitempty"`
+	// FixedParams are the required parameters the specification pins to one value, which the client sends itself.
+	FixedParams     Params    `json:"fixedParams,omitempty"`
+	HasParams       bool      `json:"hasParams,omitzero"`
+	ParamStructName string    `json:"paramStructName,omitzero"`
+	RequestBody     *ReqBody  `json:"requestBody,omitempty"`
+	Responses       Responses `json:"responses,omitempty"`
+	SuccessReturn   *GoType   `json:"successReturn,omitempty"`
+	Deprecated      bool      `json:"deprecated,omitzero"`
 	// EmptySuccess is true when the operation's success body is an empty object: the client decodes it, so anything in
 	// it is an error, and returns no value; the server writes {}.
 	EmptySuccess bool `json:"emptySuccess,omitzero"`
@@ -140,14 +144,49 @@ func (op Operation) NilParamsExpr() string {
 }
 
 // JSPathTemplate returns the path template with {jsonName} placeholders replaced
-// by ${goName} JavaScript template-literal interpolations.
+// by ${goName} JavaScript template-literal interpolations, and those of fixed
+// parameters by their value.
 func (op Operation) JSPathTemplate() string {
 	result := op.PathTemplate
 	for _, p := range op.PathParams {
 		result = strings.ReplaceAll(result, "{"+p.JSONName+"}", "${"+p.GoName+"}")
 	}
 
+	for _, p := range op.FixedParams {
+		if v, err := strconv.Unquote(p.Value); err == nil && p.In == "path" {
+			result = strings.ReplaceAll(result, "{"+p.JSONName+"}", url.PathEscape(v))
+		}
+	}
+
 	return result
+}
+
+// JSPath is JSPathTemplate with the fixed query, for an operation that takes no query parameters.
+func (op Operation) JSPath() string {
+	if q := op.FixedQuery(); q != "" {
+		return op.JSPathTemplate() + "?" + q
+	}
+
+	return op.JSPathTemplate()
+}
+
+// FixedHeaders are the fixed parameters sent as headers.
+func (op Operation) FixedHeaders() Params {
+	return slices.DeleteFunc(slices.Clone(op.FixedParams), func(p Param) bool {
+		return p.In != "header"
+	})
+}
+
+// FixedQuery is the encoded query of the fixed parameters sent in it.
+func (op Operation) FixedQuery() string {
+	q := url.Values{}
+	for _, p := range op.FixedParams {
+		if v, err := strconv.Unquote(p.Value); err == nil && p.In == "query" {
+			q.Set(p.JSONName, v)
+		}
+	}
+
+	return q.Encode()
 }
 
 // Schema represents a named component schema.
@@ -314,7 +353,6 @@ type GlobalType string
 
 const (
 	GlobalAPIKey    GlobalType = "APIKey"
-	GlobalVersion   GlobalType = "Version"
 	GlobalClient    GlobalType = "Client"
 	GlobalUserAgent GlobalType = "User-Agent"
 )
@@ -360,7 +398,8 @@ type Param struct {
 	Description string `json:"description,omitzero"`
 	// Item is one element of an array parameter, with v as its variable.
 	Item    *Param `json:"item,omitzero"`
-	Value   string `json:"value,omitzero"`   // hardcoded value, always the same
+	Value   string `json:"value,omitzero"`   // the Go string literal of the one value the parameter can take
+	In      string `json:"in,omitzero"`      // where a fixed parameter goes: path, query or header
 	Example string `json:"example,omitzero"` // hardcoded example for tests
 }
 

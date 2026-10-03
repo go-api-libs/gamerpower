@@ -27,6 +27,10 @@ func FromDocument(doc *openapi.Document, packageName, userAgent string, producti
 		return nil, fmt.Errorf("compress: %w", err)
 	}
 
+	if err := exportComponentNames(doc); err != nil {
+		return nil, fmt.Errorf("export names: %w", err)
+	}
+
 	if debug {
 		narrowUnspecified(doc)
 	}

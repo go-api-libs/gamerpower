@@ -13,7 +13,7 @@ change where touching one place obliges you to touch several others, and forgett
 one leaves a document that no longer resolves.
 
 > **Status: early.** The scope below is settled and operations arrive one at a
-> time, as each earns its place. `RenameSchema` and `RedirectSchema` are the first.
+> time, as each earns its place. `RenameSchema`, `RedirectSchema` and `ExtractSchema` are the first.
 
 ## Introduction
 
@@ -73,6 +73,26 @@ The third matters more than validity alone suggests: a name containing `/` would
 produce a reference that resolves somewhere else entirely, and one containing a
 space would produce a reference that does not resolve at all. Component keys must
 match `^[a-zA-Z0-9.\-_]+$`.
+
+### Extracting inline schemas
+
+`ExtractSchema` names a schema a document spells out inline wherever it is used. It moves the schemas a
+function accepts into `components.schemas` under one name, and replaces each with a reference to it:
+
+```go
+// Every inline array of RichText becomes a reference to RichTexts.
+err := edit.ExtractSchema(doc, "RichTexts", func(s *openapi.Schema) bool {
+    return s.Type == openapi.TypeArray && s.Items != nil && s.Items.Ref != nil &&
+        s.Items.Ref.Identifier == "#/components/schemas/RichText"
+})
+```
+
+The first schema the function accepts becomes the component, so it should accept only schemas that are the
+same. A description stays where it was, on the reference, since it says what the schema is used for there.
+Schemas already in `components.schemas` are left alone.
+
+It fails, changing nothing, with `ErrSchemaExists` or `ErrInvalidSchemaName` for the name, as a rename does,
+and with `ErrNoMatch` if the function accepts no schema.
 
 ### Redirecting a schema onto another
 
@@ -162,6 +182,28 @@ drop the one that lost. See [Scope](#scope) below.
 
 [`openapi-merge`]: https://github.com/MarkRosemaker/openapi-merge
 
+### Counting and describing references
+
+`CountReferences` counts the references to each component schema, wherever in
+the document they occur.
+
+`DescribeReferences` gives every reference to the named schemas a description
+beside the `$ref`, unless the reference has one of its own. A description says
+what a schema is used for in one place, so before redirecting schemas that
+describe the same shape onto one, describing the references to each keeps what
+each meant where it was used:
+
+```go
+if err := edit.DescribeReferences(doc, map[string]string{
+    "BotWorkspaceName": "The name of the bot's workspace.",
+}); err != nil {
+    log.Fatal(err)
+}
+```
+
+It fails, changing nothing, if a name is not in `components.schemas`
+(`ErrSchemaNotFound`).
+
 ## Scope
 
 Operations belong here when they satisfy two conditions: they **mutate** a
@@ -174,7 +216,9 @@ node being changed.
   `RenameSchemas`)
 - ✅ Repointing every reference to a duplicate component onto the one that
   survives, and removing the duplicate (`RedirectSchema`, `RedirectSchemas`)
-- Moving a definition between inline and `components`, keeping references intact
+- ✅ Moving inline definitions into `components`, replacing each with a reference (`ExtractSchema`)
+- ✅ Counting the references to each component (`CountReferences`), and
+  describing them where they are used (`DescribeReferences`)
 
 **Out of scope**
 

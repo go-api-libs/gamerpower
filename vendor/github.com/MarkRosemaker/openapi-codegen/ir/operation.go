@@ -2,6 +2,8 @@ package ir
 
 import (
 	"cmp"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"net/http"
 	"slices"
@@ -34,7 +36,7 @@ func FromOperation(
 	parsedPath := rawPath.Parse()
 
 	// Resolve each parameter and index by name for path arg computation.
-	var pathParams, queryParams, headerParams []Param
+	var pathParams, queryParams, headerParams, fixedParams []Param
 
 	paramByName := make(map[string]Param, len(merged))
 
@@ -58,6 +60,13 @@ func FromOperation(
 		param.Description = cmp.Or(ref.Description, param.Description)
 
 		paramByName[p.Name] = param
+
+		if param.Value != "" {
+			param.In = string(p.In)
+			fixedParams = append(fixedParams, param)
+
+			continue
+		}
 
 		switch p.In {
 		case openapi.ParameterLocationPath:
@@ -104,6 +113,7 @@ func FromOperation(
 		PathParams:      pathParams,
 		QueryParams:     queryParams,
 		HeaderParams:    headerParams,
+		FixedParams:     fixedParams,
 		HasParams:       hasParams,
 		ParamStructName: paramStructName,
 		RequestBody:     reqBody,
@@ -254,11 +264,7 @@ func fromParam(p *openapi.Parameter, apiTitle string) (Param, error) {
 			param.GlobalType = GlobalClient
 			param.VarName = "client"
 		default:
-			if p.In == openapi.ParameterLocationHeader &&
-				strings.HasSuffix(p.Name, "Version") {
-				param.GlobalType = GlobalVersion
-				param.Value = fixedValue(deref(p.Schema))
-			}
+			param.Value = fixedValue(deref(schema))
 		}
 	}
 
@@ -424,6 +430,10 @@ func (p Param) NotZero() string {
 
 // formatExpr returns the Go expression that converts the param to a string for URL encoding.
 func (p Param) FormatExpr() string {
+	if p.Value != "" {
+		return p.Value
+	}
+
 	if p.GlobalType != "" {
 		return "c." + p.VarName
 	}
@@ -608,18 +618,26 @@ func statusCodeToConst(code openapi.StatusCode) string {
 	return "http.Status" + strings.ReplaceAll(text, " ", "")
 }
 
-// fixedValue is the value a schema pins a parameter to: its example, else its const, else its only enum value.
+// fixedValue is the Go string literal of the one value s allows: its const, else the only value of its enum. It is
+// empty if s allows more than one.
 func fixedValue(s *openapi.Schema) string {
+	var v jsontext.Value
+
 	switch {
-	case s.Example != nil:
-		return s.Example.String()
 	case len(s.Const) > 0:
-		return s.Const.String()
+		v = s.Const
 	case len(s.Enum) == 1:
-		return s.Enum[0].String()
+		v = s.Enum[0]
 	default:
 		return ""
 	}
+
+	var str string
+	if err := json.Unmarshal(v, &str); err == nil {
+		return strconv.Quote(str)
+	}
+
+	return strconv.Quote(string(v)) // a number or a boolean is sent as it is written
 }
 
 // isEmptyObject reports whether s is an object that holds no member at all.

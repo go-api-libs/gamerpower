@@ -301,6 +301,17 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 	}
 	{{- end }}
 {{ end }}
+{{- with .FixedQuery }}
+	{{- if $op.QueryParams }}
+	if u.RawQuery != "" {
+		u.RawQuery += "&"
+	}
+
+	u.RawQuery += {{ printf "%q" . }}
+	{{- else }}
+	u.RawQuery = {{ printf "%q" . }}
+	{{- end }}
+{{ end }}
 {{ if .RequestBody -}}
 	pr, pw := io.Pipe()
 {{ end -}}
@@ -312,10 +323,13 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 			"Authorization":  []string{c.basic},
 			{{ end -}}
 			{{ range $.GlobalParams -}}
-			"{{ .JSONName }}": []string{ {{- or .Value .FormatExpr -}} },
+			"{{ .JSONName }}": []string{ {{- .FormatExpr -}} },
 			{{ end -}}
 			{{ range .HeaderParams -}}
-			"{{ .JSONName }}": []string{ {{- or .Value .FormatExpr -}} },
+			"{{ .JSONName }}": []string{ {{- .FormatExpr -}} },
+			{{ end -}}
+			{{ range .FixedHeaders -}}
+			"{{ .JSONName }}": []string{ {{- .Value -}} },
 			{{ end -}}
 			"User-Agent":     []string{c.userAgent},
 			{{ if .RequestBody -}}

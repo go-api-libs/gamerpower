@@ -202,7 +202,7 @@ window.API = {
     // {{.Method}} {{.PathTemplate}}{{with .Summary}}
     {{ toGoComment . }}{{end}}
     {{.Name | camelCase}}: ({{- range $i, $p := .PathParams}}{{if $i}}, {{end}}{{$p.GoName}}{{end}}{{if .QueryParams}}{{if .PathParams}}, {{end}}params = {}{{end}}{{if .RequestBody}}{{if or .PathParams .QueryParams}}, {{end}}body{{end -}}) =>{{if .QueryParams}} {
-        const q = new URLSearchParams();
+        const q = new URLSearchParams({{- with .FixedQuery}}{{printf "%q" .}}{{end -}});
         {{- range .QueryParams}}
         {{- if .Item}}
         for (const v of params.{{.GoName}} ?? []) q.append({{printf "%q" .JSONName}}, String(v));
@@ -219,7 +219,7 @@ window.API = {
             {{- end}}
             operationId: {{printf "%q" .Name}},
         });
-    },{{else}} apiFetch({{if .PathParams}}`{{.JSPathTemplate}}`{{else}}"{{.PathTemplate}}"{{end}}, {
+    },{{else}} apiFetch({{if .PathParams}}`{{.JSPath}}`{{else}}{{printf "%q" .JSPath}}{{end}}, {
         {{- if ne .Method "GET"}}
         method: {{printf "%q" .Method}},
         {{- end}}
