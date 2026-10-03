@@ -407,8 +407,8 @@ func mergeObjectProperties(a, b *openapi.Schema) error {
 			}
 		}
 
-		// merge all property values with prop
-		for _, prop := range b.Properties {
+		// merge all property values with prop, in the order they were recorded, since the first example is the one kept
+		for _, prop := range b.Properties.ByIndex() {
 			if err := Schema(deref(ap.Schema), deref(prop), false); err != nil {
 				return &errpath.ErrField{Field: "additionalProperties", Err: err}
 			}
