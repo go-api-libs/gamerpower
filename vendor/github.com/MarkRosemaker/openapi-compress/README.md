@@ -59,6 +59,18 @@ shape would erase exactly those, giving IDs, emoji names and time zones one type
 A scalar with a constraint, such as a `format` or an `enum`, merges like any other
 schema.
 
+### What a merge keeps
+
+Of the schemas that merge, the one kept is the one with the most references,
+else the one with the shortest name, else the alphabetically first: the `{id}`
+object most of a specification refers to keeps its own name rather than taking
+one derived from a single place that also used it.
+
+A description says what a schema is used for in one place, not what shape it
+has. When the schemas that merge disagree on it, each one's description moves
+beside the `$ref`s that pointed at it, and the schema kept has none, so no
+reference shows another's. A reference with a description of its own keeps it.
+
 ## Usage
 
 ```bash

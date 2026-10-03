@@ -12,7 +12,7 @@
 		"rest-api",
 		"swagger"
 	],
-	"coverage": 78.3,
+	"coverage": 79.3,
 	"devtoolVersion": "v0.0.0-20261002220417-4b4a1de14bff",
 	"kind": "cli"
 }

@@ -1,6 +1,7 @@
 package compress
 
 import (
+	"cmp"
 	"encoding/json/v2"
 	"math"
 	"reflect"
@@ -86,6 +87,12 @@ func deduplicateSchemasAtThreshold(d *openapi.Document, threshold float64) (map[
 		return isBareScalar(schemas[name])
 	})
 
+	// The first of schemas that merge is the one kept: the one with the most references, else the shortest name.
+	refs := edit.CountReferences(d)
+	slices.SortStableFunc(names, func(a, b string) int {
+		return cmp.Or(cmp.Compare(refs[b], refs[a]), cmp.Compare(len(a), len(b)))
+	})
+
 	// the loop below runs over every pair, so it looks schemas up by position rather than by name
 	list := make([]*openapi.Schema, len(names))
 	keys := make([]string, len(names))
@@ -155,6 +162,10 @@ func deduplicateSchemasAtThreshold(d *openapi.Document, threshold float64) (map[
 	canonicals := make(map[string]bool, len(replacements))
 	for _, canonical := range replacements {
 		canonicals[canonical] = true
+	}
+
+	if err := edit.DescribeReferences(d, describeWhereUsed(schemas, replacements)); err != nil {
+		return nil, err
 	}
 
 	if err := edit.RedirectSchemas(d, replacements); err != nil {
@@ -341,4 +352,37 @@ func sharedNames(a, b openapi.Schemas) int {
 	}
 
 	return n
+}
+
+// describeWhereUsed returns the description of each schema merging into another, or being merged into, wherever the
+// schemas merging into one disagree on it, and takes it off the schema kept.
+//
+// A description says what a schema is used for in one place, not what shape it has, so after the merge it belongs
+// beside the references to each schema rather than on the one kept, where every reference would show it.
+func describeWhereUsed(schemas openapi.Schemas, replacements map[string]string) map[string]string {
+	groups := map[string][]string{}
+	for name, canonical := range replacements {
+		groups[canonical] = append(groups[canonical], name)
+	}
+
+	describe := map[string]string{}
+
+	for canonical, merged := range groups {
+		members := append(merged, canonical)
+
+		desc := schemas[canonical].Description
+		if !slices.ContainsFunc(members, func(name string) bool { return schemas[name].Description != desc }) {
+			continue
+		}
+
+		for _, name := range members {
+			if d := schemas[name].Description; d != "" {
+				describe[name] = d
+			}
+		}
+
+		schemas[canonical].Description = ""
+	}
+
+	return describe
 }
