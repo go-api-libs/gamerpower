@@ -24,21 +24,21 @@ var jsonOpts = json.JoinOptions(
 // Giveaway defines a model
 type Giveaway struct {
 	ID              int     `json:"id"`
-	Title           string  `json:"title,omitzero"`
-	Worth           string  `json:"worth,omitzero"`
-	Thumbnail       url.URL `json:"thumbnail,omitzero"`
-	Image           url.URL `json:"image,omitzero"`
-	Description     string  `json:"description,omitzero"`
-	Instructions    string  `json:"instructions,omitzero"`
-	OpenGiveawayURL url.URL `json:"open_giveaway_url,omitzero"`
-	PublishedDate   string  `json:"published_date,omitzero"`
-	Type            string  `json:"type,omitzero"`
-	Platforms       string  `json:"platforms,omitzero"`
-	EndDate         string  `json:"end_date,omitzero"`
+	Title           string  `json:"title"`
+	Worth           string  `json:"worth"`
+	Thumbnail       url.URL `json:"thumbnail"`
+	Image           url.URL `json:"image"`
+	Description     string  `json:"description"`
+	Instructions    string  `json:"instructions"`
+	OpenGiveawayURL url.URL `json:"open_giveaway_url"`
+	PublishedDate   string  `json:"published_date"`
+	Type            string  `json:"type"`
+	Platforms       string  `json:"platforms"`
+	EndDate         string  `json:"end_date"`
 	Users           int     `json:"users"`
-	Status          string  `json:"status,omitzero"`
-	GamerpowerURL   url.URL `json:"gamerpower_url,omitzero"`
-	OpenGiveaway    url.URL `json:"open_giveaway,omitzero"`
+	Status          string  `json:"status"`
+	GamerpowerURL   url.URL `json:"gamerpower_url"`
+	OpenGiveaway    url.URL `json:"open_giveaway"`
 }
 
 // Giveaways defines a model
@@ -47,5 +47,5 @@ type Giveaways []Giveaway
 // Worth defines a model
 type Worth struct {
 	ActiveGiveawaysNumber int    `json:"active_giveaways_number"`
-	WorthEstimationUsd    string `json:"worth_estimation_usd,omitzero"`
+	WorthEstimationUsd    string `json:"worth_estimation_usd"`
 }
