@@ -19,8 +19,13 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	var specPath string
+	var (
+		specPath string
+		cfg      flatten.Config
+	)
+
 	flag.StringVar(&specPath, "spec", "api/openapi.json", "path to OpenAPI spec file")
+	flag.BoolVar(&cfg.MarkOrigin, "mark-origin", false, "mark each schema moved into the components with x-flattened-from")
 	flag.Parse()
 
 	doc, err := openapi.LoadFromFile(specPath)
@@ -30,7 +35,7 @@ func run(ctx context.Context) error {
 
 	wasValid := doc.Validate() == nil
 
-	if err := flatten.Document(doc); err != nil {
+	if err := flatten.Document(doc, cfg); err != nil {
 		return err
 	}
 
