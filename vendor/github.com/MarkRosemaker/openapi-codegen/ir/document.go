@@ -19,7 +19,7 @@ import (
 // cfg provides the package name and optional user-agent override. In debug mode, nothing the specification leaves
 // open decodes into any: see narrowUnspecified.
 func FromDocument(doc *openapi.Document, packageName, userAgent string, production, debug bool) (*Document, error) {
-	if err := flatten.Document(doc); err != nil {
+	if err := flatten.Document(doc, flatten.Config{MarkOrigin: true}); err != nil {
 		return nil, fmt.Errorf("flatten: %w", err)
 	}
 
