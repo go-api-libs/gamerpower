@@ -40,7 +40,7 @@ github.com/MarkRosemaker/openapi-enrich/recorder
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-flatten
 github.com/MarkRosemaker/openapi-flatten/cmd/openapi-flatten
-# github.com/MarkRosemaker/openapi-merge v0.0.0-20261004011330-3379b57c9522
+# github.com/MarkRosemaker/openapi-merge v0.0.0-20261004040208-55d73e282cbb
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-merge
 # github.com/MarkRosemaker/ordmap v0.0.0-20261004011225-24f826464615
