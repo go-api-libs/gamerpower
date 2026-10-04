@@ -624,10 +624,10 @@ func mergeIntoAlternative(alt, b *openapi.Schema) error {
 func matchingAlternative(alts openapi.SchemaList, b *openapi.Schema) (int, error) {
 	discriminators := map[string]bool{}
 
-	idx, _, ok := matchAlternative(alts, b, false, discriminators)
+	idx, _, _, ok := matchAlternative(alts, b, false, discriminators)
 	if !ok && b.Type == openapi.TypeString {
 		// an alternative without a format takes any string, when none has b's
-		idx, _, ok = matchAlternative(alts, b, true, discriminators)
+		idx, _, _, ok = matchAlternative(alts, b, true, discriminators)
 	}
 
 	if ok {
@@ -653,13 +653,14 @@ func matchingAlternative(alts openapi.SchemaList, b *openapi.Schema) (int, error
 
 // matchAlternative is the search [matchingAlternative] makes, with anyFormat letting an alternative of strings
 // without a format take a string of any format -- see [oneOfBranchMatches]. It reports whether one matches, and
-// whether through its pinned properties. An alternative that is itself a union
-// matches as its own best alternative does. It adds the names of the pinned properties that did not match to
-// discriminators.
+// whether through its pinned properties. Of the alternatives that match through them, it picks the one that declares
+// the most of b's properties: a partial object pins what the full one does, but declares less of what was recorded.
+// An alternative that is itself a union matches as its own best alternative does. It adds the names of the pinned
+// properties that did not match to discriminators.
 func matchAlternative(
 	alts openapi.SchemaList, b *openapi.Schema, anyFormat bool, discriminators map[string]bool,
-) (idx int, pinned, ok bool) {
-	fallback := -1
+) (idx, fit int, pinned, ok bool) {
+	best, bestFit, fallback := -1, -1, -1
 
 	for i, alt := range alts {
 		alt = deref(alt)
@@ -670,8 +671,10 @@ func matchAlternative(
 		}
 
 		if len(union) > 0 {
-			if _, p, ok := matchAlternative(union, b, anyFormat, discriminators); p {
-				return i, true, true
+			if _, f, p, ok := matchAlternative(union, b, anyFormat, discriminators); p {
+				if f > bestFit {
+					best, bestFit = i, f
+				}
 			} else if ok && fallback == -1 {
 				fallback = i
 			}
@@ -692,16 +695,40 @@ func matchAlternative(
 			continue
 		}
 
-		if hasValues(b, values) {
-			return i, true, true
+		if !hasValues(b, values) {
+			for name := range values {
+				discriminators[name] = true
+			}
+
+			continue
 		}
 
-		for name := range values {
-			discriminators[name] = true
+		if f := declared(alt, b); f > bestFit {
+			best, bestFit = i, f
 		}
 	}
 
-	return fallback, false, fallback != -1
+	if best != -1 {
+		return best, bestFit, true, true
+	}
+
+	return fallback, 0, false, fallback != -1
+}
+
+// declared is the number of b's properties s, or the parts of its allOf, declares.
+func declared(s, b *openapi.Schema) int {
+	n := 0
+
+	for name := range b.Properties {
+		if slices.ContainsFunc(append(openapi.SchemaList{s}, s.AllOf...), func(part *openapi.Schema) bool {
+			_, ok := deref(part).Properties[name]
+			return ok
+		}) {
+			n++
+		}
+	}
+
+	return n
 }
 
 // pinnedProperties are the properties s, or the parts of its allOf, allows

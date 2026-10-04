@@ -58,7 +58,9 @@ particular ways that sample-derived schemas disagree:
   or `anyOf`, the other is merged into whichever branch it matches. Of a tagged
   union's objects, the branch is the one whose pinned properties — a `const` or
   one-value `enum`, such as `"type": {"const": "select"}` — the sample has, so a
-  sample never lands in a sibling's branch; with none that matches, the merge
+  sample never lands in a sibling's branch; of several that match, it is the one
+  that declares the most of the sample's properties, so a full object wins over
+  its partial form. With none that matches, the merge
   fails and names the values it got. A branch that is itself a union matches as
   its own branches do, an integer matches a number branch, and a string without
   a format matches when no branch has the sample's.
