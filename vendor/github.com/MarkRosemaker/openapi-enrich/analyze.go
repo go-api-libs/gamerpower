@@ -110,10 +110,13 @@ func analyzeInteraction(doc *openapi.Document, ia *cassette.Interaction) error {
 	}
 
 	// 7. Process request body.
-	if len(ia.Request.Body) > 0 && isJSONMediaType(contentType) {
+	switch {
+	case len(ia.Request.Body) > 0 && isJSONMediaType(contentType):
 		if err := processRequestBody(op, ia.Request.Body, contentType); err != nil {
 			return fmt.Errorf("request body: %w", err)
 		}
+	case contentType != "" && !cassette.IsText(contentType) && (ia.Request.BodyOmitted || len(ia.Request.Body) > 0):
+		addBinaryRequestBody(op, contentType)
 	}
 
 	// 8. Infer operation ID if not already set.
@@ -525,4 +528,32 @@ func isCustomHeader(key string) bool {
 	_, isStd := standardRequestHeaders[key]
 
 	return !isStd
+}
+
+// addBinaryRequestBody gives op a request body of the media type contentType that is not text, such as a file
+// upload, if it has none of that type yet: a string of bytes, as the recording does not keep it.
+func addBinaryRequestBody(op *openapi.Operation, contentType string) {
+	if op.RequestBody == nil {
+		op.RequestBody = &openapi.RequestBodyRef{Value: &openapi.RequestBody{Required: true, Content: openapi.Content{}}}
+	}
+
+	rb := op.RequestBody.Value
+	if rb == nil {
+		return
+	}
+
+	if _, ok := rb.Content[openapi.MediaRange(contentType)]; ok {
+		return
+	}
+
+	if rb.Content == nil {
+		rb.Content = openapi.Content{}
+	}
+
+	rb.Content.Set(openapi.MediaRange(contentType), &openapi.MediaType{Schema: binarySchema()})
+}
+
+// binarySchema is the schema of a body that is not text: a string of bytes.
+func binarySchema() *openapi.Schema {
+	return &openapi.Schema{Type: openapi.TypeString, Format: openapi.FormatBinary}
 }

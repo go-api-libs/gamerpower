@@ -60,9 +60,10 @@ How the specification maps onto Go:
   says it is not set: nil for a slice or a map, `""` for a string. An alternative that is only `null` needs no field. Where a member tells
   the alternatives apart (the `discriminator`'s `propertyName`, or a member each
   alternative fixes to a string of its own, such as Notion's `type`), that member
-  must come first: decoding reads it, and the alternative it names decodes each
-  further member as it is read, without reading the whole value first. An unknown
-  value, or a different first member, is an error. An alternative that is a union of
+  names the alternative. When it comes first, the alternative it names decodes
+  each further member as it is read, without reading the whole value first;
+  when it does not, the value is read whole and then decoded the same way. An
+  unknown value, or a value without that member, is an error. An alternative that is a union of
   its own counts by its alternatives, however deep, so its leaves are chosen the same
   way. Encoding writes the discriminator first, with the value of the alternative
   set, and refuses a different one. Otherwise each alternative is tried in turn.

@@ -20,7 +20,7 @@ func buildResponse(resp *cassette.Response) (*openapi.Response, error) {
 	r := &openapi.Response{Description: description}
 
 	ct := resp.Headers.Get("Content-Type")
-	if ct == "" || len(resp.Body) == 0 {
+	if ct == "" || len(resp.Body) == 0 && !resp.BodyOmitted {
 		return r, nil
 	}
 
@@ -30,6 +30,11 @@ func buildResponse(resp *cassette.Response) (*openapi.Response, error) {
 	}
 
 	switch {
+	case !cassette.IsText(mediaType):
+		// a zip, a PDF, an image or the like, which the recording does not keep
+		r.Content = openapi.Content{}
+		r.Content.Set(openapi.MediaRange(mediaType), &openapi.MediaType{Schema: binarySchema()})
+
 	case isJSONMediaType(mediaType):
 		schema, err := newSchemaFromJSON(resp.Body)
 		if err != nil {

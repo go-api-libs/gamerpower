@@ -23,10 +23,12 @@ type Request struct {
 	URL     string      `json:"url"`
 	Headers http.Header `json:"header,omitempty"`
 	Body    Body        `json:"body,omitempty"`
+	// BodyOmitted is set for a body that was not text, see [IsText], which is not recorded.
+	BodyOmitted bool `json:"bodyOmitted,omitzero"`
 }
 
 // NewRequest creates a new [Request] out of an [*http.Request].
-// If the request has a body, it is drained and restored.
+// If the request has a body of text, it is drained and restored; any other is left as it is, and recorded as omitted.
 func NewRequest(req *http.Request) (Request, error) {
 	r := Request{
 		Method:  req.Method,
@@ -35,6 +37,11 @@ func NewRequest(req *http.Request) (Request, error) {
 	}
 
 	if req.Body == nil || req.Body == http.NoBody {
+		return r, nil
+	}
+
+	if !IsText(req.Header.Get("Content-Type")) {
+		r.BodyOmitted = true
 		return r, nil
 	}
 
@@ -77,14 +84,22 @@ type Response struct {
 	StatusCode int         `json:"statusCode"`
 	Headers    http.Header `json:"header,omitempty"`
 	Body       Body        `json:"body,omitempty"`
+	// BodyOmitted is set for a body that was not text, see [IsText], which is not recorded.
+	BodyOmitted bool `json:"bodyOmitted,omitzero"`
 }
 
 // NewResponse creates a new [Response] out of an [*http.Response].
-// If the response has a body, it is drained and restored.
+// If the response has a body of text, it is drained and restored; any other, such as a zip, is left to stream as it
+// is, and recorded as omitted.
 func NewResponse(resp *http.Response) (Response, error) {
 	r := Response{
 		StatusCode: resp.StatusCode,
 		Headers:    resp.Header.Clone(),
+	}
+
+	if !IsText(resp.Header.Get("Content-Type")) {
+		r.BodyOmitted = resp.Body != nil && resp.Body != http.NoBody
+		return r, nil
 	}
 
 	// Drain and restore the response body.

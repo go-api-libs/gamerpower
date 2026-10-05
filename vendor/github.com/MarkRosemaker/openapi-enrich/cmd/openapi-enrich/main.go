@@ -97,6 +97,7 @@ func run(ctx context.Context) error {
 	}
 
 	ias.TrimResponseHeaders()
+	ias.TrimBodies(cassette.MaxStringLen)
 
 	if trimExamples > 0 {
 		ias.TrimResponseBodies(trimExamples)

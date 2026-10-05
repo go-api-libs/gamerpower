@@ -45,8 +45,11 @@ func (ias Interactions) MarshalWrite(w io.Writer) error {
 
 var mu sync.Mutex
 
-// AddInteraction adds an interaction to the given path for debug purposes.
+// AddInteraction adds an interaction to the given path for debug purposes, with its bodies trimmed as
+// [Interactions.TrimBodies] does with [MaxStringLen].
 func AddInteraction(path string, ia Interaction) error {
+	ia.trimBodies(MaxStringLen)
+
 	mu.Lock()
 	defer mu.Unlock()
 
