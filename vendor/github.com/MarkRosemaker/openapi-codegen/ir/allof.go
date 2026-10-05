@@ -10,10 +10,15 @@ import (
 )
 
 // objectShape returns the members an object schema declares and those it requires, following references and allOf.
-// ok is false for a schema that is not a plain object, such as a union.
+// A union that is a [Tagged] struct is the struct's object. ok is false for any other schema that is not a plain
+// object, such as a union.
 func objectShape(s *openapi.Schema) (members, required []string, ok bool) {
 	s = deref(s)
-	if s == nil || len(s.OneOf) > 0 || len(s.AnyOf) > 0 || s.Type != "" && s.Type != openapi.TypeObject {
+	if s != nil && s.Type == "" && (len(s.OneOf) > 0 || len(s.AnyOf) > 0) {
+		return taggedShapeOf(s)
+	}
+
+	if s == nil || s.Type != "" && s.Type != openapi.TypeObject {
 		return nil, nil, false
 	}
 

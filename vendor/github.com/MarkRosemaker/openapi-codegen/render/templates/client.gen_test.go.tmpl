@@ -221,6 +221,13 @@ func replay(t *testing.T) http.RoundTripper {
 			worth checking; the credential after it is not. */}}
 		gotScheme, _, _ := strings.Cut(r.Headers.Get("Authorization"), " ")
 		wantScheme, _, _ := strings.Cut(ia.Request.Headers.Get("Authorization"), " ")
+		{{- if .HasOptionalAuthCalls }}
+		{{/* An operation whose credentials are optional sends them when it has them, so a call
+		     recorded without them still matches its recording. */}}
+		if wantScheme == "" && req.Context().Value(optionalAuthKey{}) != nil {
+			wantScheme = gotScheme
+		}
+		{{- end }}
 		if gotScheme != wantScheme {
 			return nil, fmt.Errorf("interaction #%d: got Authorization scheme %q, want %q", idx, gotScheme, wantScheme)
 		}
@@ -241,6 +248,17 @@ func replay(t *testing.T) http.RoundTripper {
 	})
 }
 
+{{ if .HasOptionalAuthCalls -}}
+
+// optionalAuthKey marks the context of a call to an operation whose credentials are optional.
+type optionalAuthKey struct{}
+
+// optionalAuth is ctx for a call to an operation whose credentials are optional, whose recording may lack them.
+func optionalAuth(ctx context.Context) context.Context {
+	return context.WithValue(ctx, optionalAuthKey{}, true)
+}
+
+{{ end -}}
 {{ if .NeedMustDecodeBody -}}
 
 // mustDecodeBody decodes data, the recorded JSON for one request body value
@@ -278,7 +296,7 @@ func TestClient_Interactions(t *testing.T) {
 	}
 	{{range .InteractionCalls}}
 	{{- if .Op.SuccessReturn}}
-	if _, err := c.{{.Op.Name}}(ctx{{range .PathArgs}}, {{.}}{{end}}{{if .Op.ParamsInStruct}}, {{ if not .Op.ParamsInStruct.Required }}&{{ end }}{{.Op.ParamStructName}}{
+	if _, err := c.{{.Op.Name}}({{ if and .Op.Auth .Op.AuthOptional }}optionalAuth(ctx){{ else }}ctx{{ end }}{{range .PathArgs}}, {{.}}{{end}}{{if .Op.ParamsInStruct}}, {{ if not .Op.ParamsInStruct.Required }}&{{ end }}{{.Op.ParamStructName}}{
 		{{range .QueryArgs}}{{.FieldName}}: {{.Literal}},
 		{{ end -}}
 		{{range .HeaderArgs}}{{.FieldName}}: {{.Literal}},
@@ -294,7 +312,7 @@ func TestClient_Interactions(t *testing.T) {
 	{{- end}}
 	{{- end}}
 	{{else}}
-	if err := c.{{.Op.Name}}(ctx{{range .PathArgs}}, {{.}}{{end}}{{if .QueryArgs}}, &{{.Op.ParamStructName}}{
+	if err := c.{{.Op.Name}}({{ if and .Op.Auth .Op.AuthOptional }}optionalAuth(ctx){{ else }}ctx{{ end }}{{range .PathArgs}}, {{.}}{{end}}{{if .QueryArgs}}, &{{.Op.ParamStructName}}{
 		{{range .QueryArgs}}{{.FieldName}}: {{.Literal}},
 		{{end}}}{{else if .Op.QueryParams}}, nil{{end}}{{if .Op.RequestBody}}, {{.BodyLiteral}}{{end}});
 	{{- if .IsSuccess}} err != nil {

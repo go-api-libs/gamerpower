@@ -98,16 +98,18 @@ type Operation struct {
 	// the document's for this operation only.
 	BaseURL *URLParts `json:"baseURL,omitzero"`
 	// Auth is the scheme whose credential the operation sends, if any.
-	Auth         AuthScheme `json:"auth,omitzero"`
-	Name         string     `json:"name,omitzero"`
-	Description  string     `json:"description,omitzero"`
-	Summary      string     `json:"summary,omitzero"`
-	Method       string     `json:"method,omitzero"`
-	PathTemplate string     `json:"pathTemplate,omitzero"`
-	JoinPathArgs []string   `json:"joinPathArgs,omitempty"`
-	PathParams   Params     `json:"pathParams,omitempty"`
-	QueryParams  Params     `json:"queryParams,omitempty"`
-	HeaderParams Params     `json:"headerParams,omitempty"`
+	Auth AuthScheme `json:"auth,omitzero"`
+	// AuthOptional is set if the operation may also be called without credentials, which it sends all the same.
+	AuthOptional bool     `json:"authOptional,omitzero"`
+	Name         string   `json:"name,omitzero"`
+	Description  string   `json:"description,omitzero"`
+	Summary      string   `json:"summary,omitzero"`
+	Method       string   `json:"method,omitzero"`
+	PathTemplate string   `json:"pathTemplate,omitzero"`
+	JoinPathArgs []string `json:"joinPathArgs,omitempty"`
+	PathParams   Params   `json:"pathParams,omitempty"`
+	QueryParams  Params   `json:"queryParams,omitempty"`
+	HeaderParams Params   `json:"headerParams,omitempty"`
 	// FixedParams are the required parameters the specification pins to one value, which the client sends itself.
 	FixedParams     Params    `json:"fixedParams,omitempty"`
 	HasParams       bool      `json:"hasParams,omitzero"`
@@ -467,6 +469,11 @@ func (t GoType) Nilable() string {
 	}
 }
 
+// NilByItself reports whether Nilable is the type itself, a slice or a nilable type, not a pointer to it.
+func (t GoType) NilByItself() bool {
+	return t.IsSlice || t.IsNilable
+}
+
 // ZeroValue returns the Go zero-value literal for the type.
 func (t GoType) ZeroValue() string {
 	if t.IsPointer || t.IsSlice || t.IsArrayOfSize > 0 {
@@ -562,6 +569,12 @@ func (op Operation) BaseURLExpr() string {
 // HasTagged reports whether a generated type is a [Tagged] struct, needing the helpers that check one.
 func (doc Document) HasTagged() bool {
 	return slices.ContainsFunc(doc.Schemas, func(s Schema) bool { return s.Tagged != nil })
+}
+
+// HasOptionalAuthCalls reports whether an interaction calls an operation whose credentials are optional, whose
+// recording may lack them.
+func (d Document) HasOptionalAuthCalls() bool {
+	return slices.ContainsFunc(d.InteractionCalls, func(ic InteractionCall) bool { return ic.Op.Auth != "" && ic.Op.AuthOptional })
 }
 
 // NeedsJSONHelpers reports whether a generated type decodes its alternatives itself, needing the JSON helpers.

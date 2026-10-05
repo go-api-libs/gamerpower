@@ -66,9 +66,13 @@ func (doc Document) minimalLiteral(goType string, seen map[string]bool) (string,
 			v := t.Values[0]
 			parts = append(parts, t.Field+": "+strconv.Quote(v.Value))
 
-			if v.Required {
-				i := slices.IndexFunc(s.Fields, func(f Field) bool { return f.Name == v.Field })
-				parts = append(parts, v.Field+": "+doc.setLiteral(strings.TrimPrefix(s.Fields[i].Type, "*"), v.Zero, seen))
+			for _, m := range t.Members {
+				if !slices.Contains(v.Members, TaggedOwn{Name: m.Name, Required: true}) {
+					continue
+				}
+
+				i := slices.IndexFunc(s.Fields, func(f Field) bool { return f.Name == m.Field })
+				parts = append(parts, m.Field+": "+doc.setLiteral(strings.TrimPrefix(s.Fields[i].Type, "*"), m.Zero, seen))
 			}
 		}
 	default:

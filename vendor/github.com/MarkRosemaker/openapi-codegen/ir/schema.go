@@ -328,6 +328,7 @@ func fromComponentSchemas(schemas openapi.Schemas, uses map[string]int) ([]Schem
 
 	pointRecursiveFields(kept)
 	markStreaming(kept)
+	typeTags(kept)
 
 	return kept, nil
 }

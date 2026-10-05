@@ -72,7 +72,7 @@ func FromDocument(doc *openapi.Document, packageName, userAgent string, producti
 		return nil, fmt.Errorf("getting global parameters: %w", err)
 	}
 
-	operations, err := fromPaths(doc.Paths, auth.Default, schemes, globalParamsMap)
+	operations, err := fromPaths(doc.Paths, doc.Security, auth.Default, schemes, globalParamsMap)
 	if err != nil {
 		return nil, fmt.Errorf("paths: %w", err)
 	}
@@ -142,7 +142,7 @@ func parseServer(raw string) (URLParts, error) {
 }
 
 // fromPaths iterates all path items and operations, converting each to ir.Operation.
-func fromPaths(paths openapi.Paths, defaultAuth AuthScheme, schemes map[openapi.SecuritySchemeName]AuthScheme, globalParams paramMap) ([]Operation, error) {
+func fromPaths(paths openapi.Paths, docSecurity openapi.SecurityRequirements, defaultAuth AuthScheme, schemes map[openapi.SecuritySchemeName]AuthScheme, globalParams paramMap) ([]Operation, error) {
 	var ops []Operation
 	for path, item := range paths.ByIndex() {
 		// A path item may name its own server: SEC serves one path from
@@ -166,9 +166,11 @@ func fromPaths(paths openapi.Paths, defaultAuth AuthScheme, schemes map[openapi.
 
 			irOp.BaseURL = override
 			irOp.Auth = defaultAuth
+			irOp.AuthOptional = optionalAuth(docSecurity)
 
 			if op.Security != nil {
 				irOp.Auth = requiredAuth(op.Security, schemes)
+				irOp.AuthOptional = optionalAuth(op.Security)
 			}
 
 			ops = append(ops, *irOp)
@@ -229,6 +231,12 @@ func defaultAuth(security openapi.SecurityRequirements, schemes map[openapi.Secu
 	default:
 		return ""
 	}
+}
+
+// optionalAuth reports whether security lets a call go without credentials beside requiring some: it lists the empty
+// requirement among others.
+func optionalAuth(security openapi.SecurityRequirements) bool {
+	return len(security) > 1 && slices.ContainsFunc(security, func(r openapi.SecurityRequirement) bool { return len(r) == 0 })
 }
 
 // requiredAuth is the first scheme the client supports among the alternatives a security requirement lists.

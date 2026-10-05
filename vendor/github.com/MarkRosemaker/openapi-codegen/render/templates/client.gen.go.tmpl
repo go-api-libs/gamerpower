@@ -219,7 +219,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 // Deprecated.
 {{- end}}
 func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}} {{.Type}}{{end}}{{if .ParamsInStruct}}, params {{ if not .ParamsInStruct.Required }}*{{ end }}{{.ParamStructName}}{{end}}{{if .RequestBody}}, body {{if .RequestBody.Required}}{{.RequestBody.TypeName}}{{else}}*{{.RequestBody.TypeName}}{{end}}{{end}}) ({{.SuccessReturn.Nilable}}, error) {
-	{{- if .SuccessReturn.IsNilable}}
+	{{- if .SuccessReturn.NilByItself}}
 	out, err := c.{{.Name}}WithResult[{{.SuccessReturn}}](ctx{{range .PathParams}}, {{.GoName}}{{end}}{{if .ParamsInStruct}}, params{{end}}{{if .RequestBody}}, body{{end}})
 	if err != nil {
 		return nil, err
@@ -407,14 +407,23 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 			var out {{ if and .IsSuccess $op.SuccessReturn }}R{{ else }}{{ .GoType }}{{ end }}
 			if err := json.UnmarshalRead(rsp.Body, &out, jsonOpts); err != nil {
 				{{ if $.Debug -}}
-				if c.debug {
-					if err2 := cassette.AddInteraction("api/interactions.json", ia); err2 != nil {
-						return {{if $op.SuccessReturn}}nil, {{end}}errors.Join(api.WrapDecodingError(rsp, err), err2)
-					}
+				if !c.debug {
+					return {{if $op.SuccessReturn}}nil, {{end}}api.WrapDecodingError(rsp, err)
 				}
 
-				{{ end -}}
+				if err2 := cassette.AddInteraction("api/interactions.json", ia); err2 != nil {
+					return {{if $op.SuccessReturn}}nil, {{end}}errors.Join(api.WrapDecodingError(rsp, err), err2)
+				}
+
+				{{/* recorded for enrich to learn from, the response is still of use if all it holds beyond the
+				     specification is members it does not know yet */ -}}
+				out = *new({{ if and .IsSuccess $op.SuccessReturn }}R{{ else }}{{ .GoType }}{{ end }})
+				if err := json.Unmarshal(ia.Response.Body, &out, jsonOptsLenient); err != nil {
+					return {{if $op.SuccessReturn}}nil, {{end}}api.WrapDecodingError(rsp, err)
+				}
+				{{- else -}}
 				return {{if $op.SuccessReturn}}nil, {{end}}api.WrapDecodingError(rsp, err)
+				{{- end }}
 			}
 
 			{{ if and .IsSuccess $op.SuccessReturn -}}
