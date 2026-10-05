@@ -47,12 +47,11 @@ var jsonOpts = json.JoinOptions(
 		)),
 		{{- end }}
 	)
-{{- if or .Debug .NeedsJSONHelpers }}
+
 
 // jsonOptsLenient is jsonOpts accepting members the specification does not know, as debug mode decodes once a strict
-// decoding failed.
+// decoding failed, and as a caller's own type of a result is decoded.
 var jsonOptsLenient = json.JoinOptions(jsonOpts, json.RejectUnknownMembers(false))
-{{- end }}
 
 {{range .Operations}}{{- if or .QueryParams .HeaderParams }}
 // {{.ParamStructName}} holds the query parameters for {{.Name}}.
@@ -1195,6 +1194,13 @@ func (v *{{$s.Name}}) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	if err := json.UnmarshalDecode(dec, (*plain)(v), jsonOptsOf(dec)); err != nil {
 		return err
 	}
+	{{- if .Optional }}
+
+	// {{.Tag}} may be left out, and is then the value whose member is set, as encoding infers it
+	if tag, ok := jsonInferTag(tagsOf{{$s.Name}}, v.taggedMembers()); ok && v.{{.Field}} == "" {
+		v.{{.Field}} = {{.Type}}(tag)
+	}
+	{{- end }}
 
 	return jsonCheckTag({{ printf "%q" .Tag }}, string(v.{{.Field}}), tagsOf{{$s.Name}}, v.taggedMembers(), jsonStrict(dec))
 }

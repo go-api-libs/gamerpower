@@ -404,8 +404,20 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 		switch mt, _, _ := strings.Cut(rsp.Header.Get("Content-Type"), ";"); mt {
 		case "{{ .ContentType }}":
 			{{- if .IsJSON }}
-			var out {{ if and .IsSuccess $op.SuccessReturn }}R{{ else }}{{ .GoType }}{{ end }}
+			{{- if and .IsSuccess $op.SuccessReturn }}
+			var out R
+
+			// a type of the caller's own declares only what it needs of the response, so it is decoded leniently
+			opts := jsonOptsLenient
+			if _, ok := any(&out).(*{{ $op.SuccessReturn }}); ok {
+				opts = jsonOpts
+			}
+
+			if err := json.UnmarshalRead(rsp.Body, &out, opts); err != nil {
+			{{- else }}
+			var out {{ .GoType }}
 			if err := json.UnmarshalRead(rsp.Body, &out, jsonOpts); err != nil {
+			{{- end }}
 				{{ if $.Debug -}}
 				if !c.debug {
 					return {{if $op.SuccessReturn}}nil, {{end}}api.WrapDecodingError(rsp, err)

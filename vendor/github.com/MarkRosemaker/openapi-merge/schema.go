@@ -22,6 +22,10 @@ func Schema(a, b *openapi.Schema, isParam bool) error {
 	a.Title = mergeString(a.Title, b.Title)
 	a.Description = mergeString(a.Description, b.Description)
 
+	if handled, err := mergeIfSamples(a, b); handled {
+		return err
+	}
+
 	if handled, err := mergeIfOneOf(a, b); handled {
 		return err
 	}

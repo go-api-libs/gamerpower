@@ -13,6 +13,6 @@
 		"swagger"
 	],
 	"coverage": 85,
-	"devtoolVersion": "v0.0.0-20261005005611-72fb52502951",
+	"devtoolVersion": "v0.0.0-20261005183539-d9d30dc1fc61",
 	"kind": "library"
 }

@@ -63,6 +63,10 @@ What it infers:
 - **Request bodies** — JSON bodies produce inline object schemas.
 - **Responses** — JSON, text/plain, and text/html responses are modeled;
   repeated observations are merged.
+- **Arrays of objects** — the elements of a recorded array of objects meet the
+  specification one by one, so in a list of mixed variants, such as Notion's
+  blocks, each reaches the variant of a union it matches rather than all of them
+  one. With no union there, they merge into one item as before.
 - **Binary bodies** — a request or response body that is not text, such as a
   zip, a PDF, an image or a video, is documented by its media type as a string
   of bytes (`{"type": "string", "format": "binary"}`), from its headers alone.

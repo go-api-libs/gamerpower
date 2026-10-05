@@ -79,7 +79,7 @@ How the specification maps onto Go:
   already or a name is taken. The methods check that only members of the
   alternative the tag names are set, and that those it requires are, unless they
   can be `null`. Encoding with the tag left empty sends the value whose member is
-  set. Alternatives that are unions tagged alike count by their own alternatives,
+  set, and where an alternative may leave the tag out, decoding infers it so. Alternatives that are unions tagged alike count by their own alternatives,
   and as part of an `allOf` the union's fields join the struct's. A tagged struct
   that is an alternative of another union, there or in an `allOf`, is chosen by
   the members present, as an object is. Alternatives nothing else refers to get
@@ -118,7 +118,8 @@ How the specification maps onto Go:
   included.
 - **Null** — a schema that is only ever `null` is `*struct{}`, and "X or null"
   is `X`, a pointer to `X` only by the rule for fields above, so that null and
-  the zero value can differ.
+  the zero value can differ, or where `X` decodes itself, such as a union or a
+  tuple, which would refuse null.
 - **Fixed parameters** — a required parameter that can take only one value, its
   `const` or the only value of its `enum`, is sent by the client itself: in the
   path, the query or the headers, such as Notion's `Notion-Version`. The caller
@@ -136,7 +137,9 @@ How the specification maps onto Go:
   `T` where `T` is already nilable: a slice, a map, or a named type of either. An
   operation whose success body is an empty object returns just `error`, and the
   server writes `{}`. Its body is read only in debug mode, where it is decoded so
-  that anything in it fails loudly and is recorded.
+  that anything in it fails loudly and is recorded. `XWithResult[R]` decodes
+  into a type of the caller's own instead, leniently, since it declares only what
+  it needs; the operation's own type is decoded strictly.
 - **Binary responses** — a success body that is not text, such as a zip, a PDF,
   an image or a video, is returned as an `io.ReadCloser` that reads it as it
   arrives, never held whole in memory; the caller closes it. A text body that is

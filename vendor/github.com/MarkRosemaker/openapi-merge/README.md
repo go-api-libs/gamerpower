@@ -69,6 +69,12 @@ particular ways that sample-derived schemas disagree:
   fails and names the values it got. A branch that is itself a union matches as
   its own branches do, an integer matches a number branch, and a string without
   a format matches when no branch has the sample's.
+- **Samples** — a union marked `x-samples` (see `Samples`) holds samples of one
+  value, such as the elements of a recorded array, not alternatives the value may
+  take. Merged into a union, each sample goes into the branch it matches, so the
+  elements of a list of mixed variants each reach their own; merged into a schema
+  that is no union, each is merged into it in turn; merged into another union of
+  samples, they join it, for the caller to collapse.
 - **Common properties beside a union** — an `allOf` of objects and one union
   takes each sampled property into the part that declares it, and the rest into
   the branch the whole sample matches.

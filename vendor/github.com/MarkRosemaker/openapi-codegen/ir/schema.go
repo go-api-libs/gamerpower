@@ -46,7 +46,9 @@ func SchemaGoType(s *openapi.Schema) (*GoType, error) {
 		// The named type this $ref points at is itself array- or map-kind
 		// (e.g. "type TimeEntries []TimeEntry"), so it's already nilable on
 		// its own -- see [GoType.IsNilable].
-		isNilable := s.Ref.Value != nil && (s.Ref.Value.Type == openapi.TypeArray || mapValues(s.Ref.Value) != nil)
+		// A tuple is a struct, not a slice.
+		isNilable := s.Ref.Value != nil && (s.Ref.Value.Type == openapi.TypeArray && len(s.Ref.Value.PrefixItems) == 0 ||
+			mapValues(s.Ref.Value) != nil)
 
 		return &GoType{Name: name, IsNilable: isNilable}, nil
 	}
@@ -171,8 +173,9 @@ func nullableGoType(v *openapi.Schema) (*GoType, error) {
 		return nil, err
 	}
 
-	// null otherwise reads as the zero value, which is all it needs to be when that is no value of X
-	if zeroIsAValue(v, tp) {
+	// null otherwise reads as the zero value, which is all it needs to be when that is no value of X; a type that
+	// decodes itself, such as a union, would refuse null
+	if zeroIsAValue(v, tp) || hasJSONMethods(v) {
 		tp.IsPointer = true
 	}
 

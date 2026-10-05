@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"slices"
 	"strconv"
 	"time"
 	"uuid"
@@ -195,6 +196,12 @@ func decodeArraySchema(dec *jsontext.Decoder) (*openapi.Schema, error) {
 
 	if item, ok := mergeHomogeneous(elems); ok {
 		s.Items = item
+
+		// objects may be variants of a union, each to be routed to its own, so they meet the specification apart
+		if len(elems) > 1 && item.Type == openapi.TypeObject {
+			s.Items = merge.Samples(distinctSchemas(elems)...)
+		}
+
 		return s, nil
 	}
 
@@ -208,6 +215,43 @@ func decodeArraySchema(dec *jsontext.Decoder) (*openapi.Schema, error) {
 	}
 
 	return s, nil
+}
+
+// distinctSchemas returns l without the schemas equal to one before them.
+func distinctSchemas(l []*openapi.Schema) []*openapi.Schema {
+	seen := map[string]bool{}
+
+	return slices.DeleteFunc(slices.Clone(l), func(s *openapi.Schema) bool {
+		data, err := json.Marshal(s, json.Deterministic(true))
+		if err != nil {
+			return false
+		}
+
+		if seen[string(data)] {
+			return true
+		}
+
+		seen[string(data)] = true
+
+		return false
+	})
+}
+
+// collapseSamples replaces every union of samples left in doc, those nothing in the specification routed, by the one
+// schema its samples merge into, or by a plain union of them if they cannot.
+func collapseSamples(doc *openapi.Document) {
+	walkSchemas(doc, func(s *openapi.Schema) {
+		if !merge.IsSamples(s) {
+			return
+		}
+
+		if item, ok := mergeHomogeneous(s.AnyOf); ok {
+			*s = *item
+			return
+		}
+
+		s.Extensions = nil
+	})
 }
 
 // mergeHomogeneous attempts to merge every element into a single schema,

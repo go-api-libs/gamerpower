@@ -20,6 +20,8 @@ type Tagged struct {
 	Tag   string `json:"tag,omitzero"`
 	Field string `json:"field,omitzero"`
 	Type  string `json:"type,omitzero"`
+	// Optional is set if an alternative may leave the tag out, which decoding then infers from the members set.
+	Optional bool `json:"optional,omitzero"`
 	// Enum is set if Type is an enum type of the tag's values that the struct declares itself.
 	Enum []EnumValue `json:"enum,omitempty"`
 	// Values are the alternatives, one per value of the tag.
@@ -86,8 +88,10 @@ func orderedProperties(s *openapi.Schema) []namedSchema {
 
 // taggedShape is what makes the alternatives of a union a [Tagged] struct.
 type taggedShape struct {
-	tag    string
-	values []string
+	tag string
+	// tagOptional is set if an alternative does not require the tag.
+	tagOptional bool
+	values      []string
 	// shared are the members every alternative has, but the tag, in the order the first declares them.
 	shared []namedSchema
 	// sharedRequired are the shared members every alternative requires.
@@ -163,6 +167,7 @@ func taggedUnion(u *openapi.Schema, alts openapi.SchemaList) (*taggedShape, bool
 	for i, a := range alts {
 		props[i] = orderedProperties(a)
 		_, required[i], _ = objectShape(a)
+		shape.tagOptional = shape.tagOptional || !slices.Contains(required[i], tag)
 	}
 
 	has := func(i int, name string) *openapi.Schema {
@@ -322,7 +327,7 @@ func taggedFields(shape *taggedShape, existing []Field) ([]Field, *Tagged, bool,
 		return true
 	}
 
-	tagged := &Tagged{Tag: shape.tag}
+	tagged := &Tagged{Tag: shape.tag, Optional: shape.tagOptional}
 
 	if f, ok := byJSON[shape.tag]; ok {
 		if f.Type[0] == '*' {
@@ -354,8 +359,8 @@ func taggedFields(shape *taggedShape, existing []Field) ([]Field, *Tagged, bool,
 			Name:     tagged.Field,
 			JSONName: shape.tag,
 			Type:     tagged.Type,
-			JSONTag:  buildJSONTag(shape.tag, true),
-			Required: true,
+			JSONTag:  buildJSONTag(shape.tag, !shape.tagOptional),
+			Required: !shape.tagOptional,
 		}) {
 			return nil, nil, false, nil
 		}
