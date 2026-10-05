@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/MarkRosemaker/openapi"
+	"github.com/MarkRosemaker/openapi-enrich/cassette"
 	"github.com/ettle/strcase"
 )
 
@@ -98,7 +99,7 @@ func FromOperation(
 		}
 	}
 
-	responses, successReturn, rawBytesSuccess, emptySuccess, err := fromResponses(op.Responses)
+	responses, successReturn, rawBytesSuccess, streamSuccess, emptySuccess, err := fromResponses(op.Responses)
 	if err != nil {
 		return nil, fmt.Errorf("responses: %w", err)
 	}
@@ -121,6 +122,7 @@ func FromOperation(
 		SuccessReturn:   successReturn,
 		Deprecated:      op.Deprecated,
 		RawBytesSuccess: rawBytesSuccess,
+		StreamSuccess:   streamSuccess,
 		EmptySuccess:    emptySuccess,
 	}, nil
 }
@@ -513,11 +515,12 @@ func fromRequestBody(rb *openapi.RequestBody) (*ReqBody, error) {
 	return nil, nil
 }
 
-func fromResponses(responses openapi.OperationResponses) (Responses, *GoType, bool, bool, error) {
+func fromResponses(responses openapi.OperationResponses) (Responses, *GoType, bool, bool, bool, error) {
 	var (
 		result          Responses
 		successReturn   *GoType
 		rawBytesSuccess bool
+		streamSuccess   bool
 		emptySuccess    bool
 	)
 
@@ -551,6 +554,7 @@ func fromResponses(responses openapi.OperationResponses) (Responses, *GoType, bo
 			goType      *GoType
 			contentType string
 			isRawBytes  bool
+			isStream    bool
 		)
 
 		switch {
@@ -562,9 +566,14 @@ func fromResponses(responses openapi.OperationResponses) (Responses, *GoType, bo
 
 				goType, err = SchemaGoType(jsonSchema)
 				if err != nil {
-					return nil, nil, false, false, fmt.Errorf("response %s: %w", code, err)
+					return nil, nil, false, false, false, fmt.Errorf("response %s: %w", code, err)
 				}
 			}
+		case firstContentType != "" && isSuccess && !cassette.IsText(firstContentType):
+			// a zip, a PDF, an image or the like: the body itself, read as it arrives rather than all at once
+			contentType = firstContentType
+			goType = &GoType{Name: "io.ReadCloser", IsNilable: true}
+			isStream = true
 		case firstContentType != "":
 			contentType = firstContentType
 			goType = &GoType{Name: "byte", IsSlice: true}
@@ -583,6 +592,7 @@ func fromResponses(responses openapi.OperationResponses) (Responses, *GoType, bo
 			GoType:      goType,
 			IsSuccess:   isSuccess,
 			IsRawBytes:  isRawBytes,
+			IsStream:    isStream,
 		})
 
 		// an empty object is still decoded, so anything in it is an error, but there is nothing to return
@@ -592,11 +602,12 @@ func fromResponses(responses openapi.OperationResponses) (Responses, *GoType, bo
 			} else {
 				successReturn = goType
 				rawBytesSuccess = isRawBytes
+				streamSuccess = isStream
 			}
 		}
 	}
 
-	return result, successReturn, rawBytesSuccess, emptySuccess, nil
+	return result, successReturn, rawBytesSuccess, streamSuccess, emptySuccess, nil
 }
 
 // statusCodeToConst converts an OpenAPI status code to its net/http constant name.

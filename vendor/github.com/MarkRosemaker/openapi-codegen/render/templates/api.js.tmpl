@@ -181,7 +181,11 @@ async function apiFetch(path, options = {}) {
             return null;
         }
 
-        return await res.json();
+        // JSON is parsed, text is returned as it is, and anything else, such as a zip or an image, as a Blob
+        const type = res.headers.get("Content-Type") || "";
+        if (type.includes("json")) return await res.json();
+        if (type.startsWith("text/")) return await res.text();
+        return await res.blob();
     } catch (err) {
         clearTimeout(timeoutId);
         if (err.name === "AbortError") {

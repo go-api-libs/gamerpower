@@ -153,7 +153,14 @@ func RegisterService(svc Service, mux *http.ServeMux, pathPrefix string) {
 		}
 {{- end }}
 
-{{ if .RawBytesSuccess }}
+{{ if .StreamSuccess }}
+		defer res.Close()
+
+		if _, err := io.Copy(w, res); err != nil {
+			l.ErrorContext(ctx, "write error", slog.String("error", err.Error()))
+			return
+		}
+{{- else if .RawBytesSuccess }}
 		if _, err := w.Write(res); err != nil {
 			l.ErrorContext(ctx, "write error", slog.String("error", err.Error()))
 			return

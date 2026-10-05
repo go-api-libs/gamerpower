@@ -114,6 +114,12 @@ How the specification maps onto Go:
   operation whose success body is an empty object returns just `error`, and the
   server writes `{}`. Its body is read only in debug mode, where it is decoded so
   that anything in it fails loudly and is recorded.
+- **Binary responses** — a success body that is not text, such as a zip, a PDF,
+  an image or a video, is returned as an `io.ReadCloser` that reads it as it
+  arrives, never held whole in memory; the caller closes it. A text body that is
+  not JSON is returned as `[]byte`. The server copies a returned reader into
+  the response, and the JavaScript client returns such a body as a `Blob`, or
+  text as a string.
 - **Error responses** — an error body's type is returned wrapped in
   `api.Error`, so it needs an `Error() string` method. The generator does not
   write one, since a good message depends on the API: add it by hand beside the

@@ -56,6 +56,10 @@ What it infers:
   become non-exploded arrays.
 - **Request headers** — `Authorization` creates an HTTP security scheme;
   `x-*` and other custom headers become header parameters.
+- **Security** — an operation only called without `Authorization` gets
+  `security: []`, and one called both with and without it gets the credential
+  as optional (`{}` beside the scheme). A security list every operation shares
+  is stated once at the document level.
 - **Request bodies** — JSON bodies produce inline object schemas.
 - **Responses** — JSON, text/plain, and text/html responses are modeled;
   repeated observations are merged.

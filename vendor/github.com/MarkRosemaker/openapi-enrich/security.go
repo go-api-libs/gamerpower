@@ -1,22 +1,59 @@
 package enrich
 
 import (
+	"slices"
+
 	"github.com/MarkRosemaker/openapi"
 )
 
-// hoistSecurity moves security requirements that appear on every operation to
-// the document level, then removes them from individual operations.
+// anonymous is the security requirement met without credentials: listed beside others, it makes them optional.
+var anonymous = openapi.SecurityRequirement{}
+
+// effectiveSecurity is the security an operation is held to: its own, or else the document's. It is nil while
+// nothing is known, as for an operation only just created.
+func effectiveSecurity(doc *openapi.Document, op *openapi.Operation, created bool) openapi.SecurityRequirements {
+	if op.Security != nil || created {
+		return op.Security
+	}
+
+	return doc.Security
+}
+
+// requireAuth records that op was called with the credential req asks for.
+func requireAuth(doc *openapi.Document, op *openapi.Operation, created bool, req openapi.SecurityRequirement) {
+	eff := effectiveSecurity(doc, op, created)
+
+	switch {
+	case eff.Contains(req):
+	case eff == nil:
+		op.Security = openapi.SecurityRequirements{req}
+	case len(eff) == 0:
+		// it was called without credentials before, so they are optional
+		op.Security = openapi.SecurityRequirements{anonymous, req}
+	default:
+		op.Security = append(slices.Clone(eff), req)
+	}
+}
+
+// allowAnonymous records that op was called without credentials.
+func allowAnonymous(doc *openapi.Document, op *openapi.Operation, created bool) {
+	eff := effectiveSecurity(doc, op, created)
+
+	switch {
+	case eff == nil:
+		op.Security = openapi.SecurityRequirements{}
+	case len(eff) == 0, eff.Contains(anonymous):
+	default:
+		op.Security = append(openapi.SecurityRequirements{anonymous}, eff...)
+	}
+}
+
+// hoistSecurity states the security once at the document level, removing it from each operation, if every operation
+// is held to the same.
 //
-// This produces cleaner specs: instead of repeating `security: [{bearerAuth: []}]`
-// on every operation, the requirement is stated once at the top of the document
-// and inherited by all operations.
-//
-// A requirement is hoisted only if it appears on ALL operations. Operations
-// with an explicit empty security slice (`security: []`) count as "no security
-// required for this operation" and prevent hoisting, preserving the intentional
-// override semantics defined by the OpenAPI spec.
+// Only a whole list is hoisted: an operation's list replaces the document's, so moving part of it would change what
+// the operation requires. If no operation needs credentials, the document says so only where it defines a scheme.
 func hoistSecurity(doc *openapi.Document) {
-	// Collect all operations.
 	var ops []*openapi.Operation
 	for _, pi := range doc.Paths {
 		for _, op := range pi.Operations {
@@ -28,61 +65,29 @@ func hoistSecurity(doc *openapi.Document) {
 		return
 	}
 
-	// Gather the union of security requirements across every operation.
-	var candidates []openapi.SecurityRequirement
+	common := effectiveSecurity(doc, ops[0], false)
+	for _, op := range ops[1:] {
+		if !sameRequirements(effectiveSecurity(doc, op, false), common) {
+			return
+		}
+	}
+
+	if len(common) == 0 {
+		common = nil
+		if len(doc.Components.SecuritySchemes) > 0 {
+			common = openapi.SecurityRequirements{}
+		}
+	}
+
+	doc.Security = common
 	for _, op := range ops {
-		for _, req := range op.Security {
-			if !containsReq(candidates, req) {
-				candidates = append(candidates, req)
-			}
-		}
-	}
-
-	// Hoist each requirement that is present on every single operation.
-	for _, req := range candidates {
-		if allOpsHave(ops, req) {
-			doc.Security = append(doc.Security, req)
-			for _, op := range ops {
-				op.Security = removeReq(op.Security, req)
-			}
-		}
+		op.Security = nil
 	}
 }
 
-// allOpsHave reports whether every operation contains req in its security list.
-func allOpsHave(ops []*openapi.Operation, req openapi.SecurityRequirement) bool {
-	for _, op := range ops {
-		if !op.Security.Contains(req) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// removeReq returns reqs without req; returns nil if the result is empty.
-func removeReq(reqs openapi.SecurityRequirements, req openapi.SecurityRequirement) openapi.SecurityRequirements {
-	out := reqs[:0:0]
-	for _, r := range reqs {
-		if !r.Equals(req) {
-			out = append(out, r)
-		}
-	}
-
-	if len(out) == 0 {
-		return nil
-	}
-
-	return out
-}
-
-// containsReq reports whether reqs already contains req.
-func containsReq(reqs []openapi.SecurityRequirement, req openapi.SecurityRequirement) bool {
-	for _, r := range reqs {
-		if r.Equals(req) {
-			return true
-		}
-	}
-
-	return false
+// sameRequirements reports whether a and b list the same requirements, in any order.
+func sameRequirements(a, b openapi.SecurityRequirements) bool {
+	return len(a) == len(b) && !slices.ContainsFunc(a, func(r openapi.SecurityRequirement) bool {
+		return !b.Contains(r)
+	})
 }

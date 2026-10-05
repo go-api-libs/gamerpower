@@ -204,7 +204,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 {{range .Operations}}
 {{$op := .}}
 
-{{ if and .SuccessReturn (not .RawBytesSuccess) }}
+{{ if and .SuccessReturn (not .RawBytesSuccess) (not .StreamSuccess) }}
 {{ with .Description }}
 	{{- toGoComment . }}
 	//
@@ -232,7 +232,7 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 }
 {{ end }}
 
-{{- $withResult := and .SuccessReturn (not .RawBytesSuccess) }}
+{{- $withResult := and .SuccessReturn (not .RawBytesSuccess) (not .StreamSuccess) }}
 {{ with .Description}}
 	{{- toGoComment . }}
 	{{- if $withResult }}
@@ -253,7 +253,7 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 //
 // Deprecated.
 {{- end}}
-{{ if .RawBytesSuccess -}}
+{{ if or .RawBytesSuccess .StreamSuccess -}}
 func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}} {{.Type}}{{end}}{{if .ParamsInStruct}}, params {{ if not .ParamsInStruct.Required }}*{{ end }}{{.ParamStructName}}{{end}}{{if .RequestBody}}, body {{if .RequestBody.Required}}{{.RequestBody.TypeName}}{{else}}*{{.RequestBody.TypeName}}{{end}}{{end}}) ({{.SuccessReturn}}, error) {
 {{- else if .SuccessReturn -}}
 func (c *Client) {{.Name}}WithResult[R any](ctx context.Context{{range .PathParams}}, {{.GoName}} {{.Type}}{{end}}{{if .ParamsInStruct}}, params {{ if not .ParamsInStruct.Required }}*{{ end }}{{.ParamStructName}}{{end}}{{if .RequestBody}}, body {{if .RequestBody.Required}}{{.RequestBody.TypeName}}{{else}}*{{.RequestBody.TypeName}}{{end}}{{end}}) (*R, error) {
@@ -370,7 +370,18 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 	if err != nil {
 		return {{if .SuccessReturn}}nil, {{end}}err
 	}
+	{{- if .StreamSuccess }}
+
+	// the body is left open only when it is handed to the caller
+	streaming := false
+	defer func() {
+		if !streaming {
+			rsp.Body.Close()
+		}
+	}()
+	{{- else }}
 	defer rsp.Body.Close()
+	{{- end }}
 
 	{{ if $.Debug -}}
 	if c.debug {
@@ -392,7 +403,7 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 {{- else if or .IsSuccess .GoType }}
 		switch mt, _, _ := strings.Cut(rsp.Header.Get("Content-Type"), ";"); mt {
 		case "{{ .ContentType }}":
-			{{- if eq .ContentType "application/json" }}
+			{{- if .IsJSON }}
 			var out {{ if and .IsSuccess $op.SuccessReturn }}R{{ else }}{{ .GoType }}{{ end }}
 			if err := json.UnmarshalRead(rsp.Body, &out, jsonOpts); err != nil {
 				{{ if $.Debug -}}
@@ -413,7 +424,11 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 			{{ else -}}
 			return {{if $op.SuccessReturn}}nil, {{end}}api.NewErrCustom(rsp, &out)
 			{{ end -}}
-			{{- else if .IsRawBytes }}
+			{{- else if .IsStream }}
+			streaming = true
+
+			return rsp.Body, nil
+			{{ else if .IsRawBytes }}
 			out, err := io.ReadAll(rsp.Body)
 			if err != nil {
 				return {{if $op.SuccessReturn}}nil, {{end}}api.WrapDecodingError(rsp, err)
