@@ -107,7 +107,14 @@ func (c *Client) ListGiveawaysWithResult[R any](ctx context.Context) (*R, error)
 		switch mt, _, _ := strings.Cut(rsp.Header.Get("Content-Type"), ";"); mt {
 		case "application/json":
 			var out R
-			if err := json.UnmarshalRead(rsp.Body, &out, jsonOpts); err != nil {
+
+			// a type of the caller's own declares only what it needs of the response, so it is decoded leniently
+			opts := jsonOptsLenient
+			if _, ok := any(&out).(*Giveaways); ok {
+				opts = jsonOpts
+			}
+
+			if err := json.UnmarshalRead(rsp.Body, &out, opts); err != nil {
 				return nil, api.WrapDecodingError(rsp, err)
 			}
 
@@ -157,7 +164,14 @@ func (c *Client) GetWorthWithResult[R any](ctx context.Context) (*R, error) {
 		switch mt, _, _ := strings.Cut(rsp.Header.Get("Content-Type"), ";"); mt {
 		case "application/json":
 			var out R
-			if err := json.UnmarshalRead(rsp.Body, &out, jsonOpts); err != nil {
+
+			// a type of the caller's own declares only what it needs of the response, so it is decoded leniently
+			opts := jsonOptsLenient
+			if _, ok := any(&out).(*Worth); ok {
+				opts = jsonOpts
+			}
+
+			if err := json.UnmarshalRead(rsp.Body, &out, opts); err != nil {
 				return nil, api.WrapDecodingError(rsp, err)
 			}
 
