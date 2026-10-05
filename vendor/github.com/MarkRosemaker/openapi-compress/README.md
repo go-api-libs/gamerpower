@@ -61,10 +61,16 @@ schema.
 
 ### What a merge keeps
 
-Of the schemas that merge, the one kept is the one with the most references,
-else the one with the shortest name, else the alphabetically first: the `{id}`
-object most of a specification refers to keeps its own name rather than taking
-one derived from a single place that also used it.
+Of the schemas that merge, the one kept is one the specification named, else the
+one with the most references, else the one with the shortest name, else the
+alphabetically first: the `{id}` object a specification defines keeps its own
+name rather than taking one derived from a single place that also used it. A
+schema `openapi-flatten` moved out of the document and named itself carries
+`x-flattened-from`, given its `MarkOrigin`; compress reads and removes it before
+comparing anything, so it never keeps two schemas apart.
+
+Examples are kept from every schema that merges, down to each property, item and
+alternative: where the one kept has none, it takes one from those merged into it.
 
 A description says what a schema is used for in one place, not what shape it
 has. When the schemas that merge disagree on it, each one's description moves

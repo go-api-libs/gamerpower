@@ -198,10 +198,15 @@ func fillExamples(a, b *openapi.Schema) {
 	}
 
 	fillExamples(a.Items, b.Items)
+	fillExamples(a.Not, b.Not)
+	fillExamples(a.PropertyNames, b.PropertyNames)
 
-	for i, p := range a.PrefixItems {
-		if i < len(b.PrefixItems) {
-			fillExamples(p, b.PrefixItems[i])
+	// schemas of the same shape list the same alternatives and parts, in the same order
+	for _, l := range [][2]openapi.SchemaList{{a.PrefixItems, b.PrefixItems}, {a.AllOf, b.AllOf}, {a.OneOf, b.OneOf}, {a.AnyOf, b.AnyOf}} {
+		for i, p := range l[0] {
+			if i < len(l[1]) {
+				fillExamples(p, l[1][i])
+			}
 		}
 	}
 

@@ -53,3 +53,42 @@ func DescribeReferences(doc *openapi.Document, descriptions map[string]string) e
 
 	return nil
 }
+
+// RemoveUnreferenced removes those of the schemas names from components.schemas that nothing in doc refers to, and
+// returns the ones it removed. A schema a discriminator's mapping names is referred to, as much as by a $ref.
+//
+// It repeats until each of names that remains is referred to, since removing one can leave another without a
+// reference. A schema not among names stays, referred to or not: a specification may define one only to document it.
+func RemoveUnreferenced(doc *openapi.Document, names ...string) []string {
+	var removed []string
+
+	for {
+		used := CountReferences(doc)
+
+		walkSchemas(doc, func(s *openapi.Schema) {
+			if s.Discriminator == nil {
+				return
+			}
+
+			for _, v := range s.Discriminator.Mapping {
+				if name, ok := strings.CutPrefix(openapi.MappingRef(v.Value), schemaRefPrefix); ok {
+					used[name]++
+				}
+			}
+		})
+
+		n := len(removed)
+
+		for _, name := range names {
+			if _, ok := doc.Components.Schemas[name]; ok && used[name] == 0 {
+				delete(doc.Components.Schemas, name)
+
+				removed = append(removed, name)
+			}
+		}
+
+		if len(removed) == n {
+			return removed
+		}
+	}
+}

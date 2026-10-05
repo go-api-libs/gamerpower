@@ -204,6 +204,21 @@ if err := edit.DescribeReferences(doc, map[string]string{
 It fails, changing nothing, if a name is not in `components.schemas`
 (`ErrSchemaNotFound`).
 
+### Removing what nothing refers to
+
+An edit can leave components that nothing refers to anymore, such as the parts
+of a schema that has been rewritten. `RemoveUnreferenced` removes those of the
+names it is given that nothing refers to, by a `$ref` or in a discriminator's
+`mapping`, and returns them:
+
+```go
+removed := edit.RemoveUnreferenced(doc, "PageAllOf0", "PageAllOf1")
+```
+
+It repeats until each name that remains is referred to, since removing one can
+leave another without a reference. A component not among the names stays,
+referred to or not, since a specification may define one only to document it.
+
 ## Scope
 
 Operations belong here when they satisfy two conditions: they **mutate** a
@@ -219,6 +234,8 @@ node being changed.
 - ✅ Moving inline definitions into `components`, replacing each with a reference (`ExtractSchema`)
 - ✅ Counting the references to each component (`CountReferences`), and
   describing them where they are used (`DescribeReferences`)
+- ✅ Removing the components an edit left without a reference
+  (`RemoveUnreferenced`)
 
 **Out of scope**
 

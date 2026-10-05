@@ -26,6 +26,9 @@ func Document(d *openapi.Document, cfg Config) error {
 		return err
 	}
 
+	// read before comparing anything, since schemas with different extensions have different shapes
+	derived := takeOrigins(d)
+
 	deduplicateParameters(d)
 
 	// Step down from exact equality to MinSimilarity, running each threshold
@@ -34,7 +37,7 @@ func Document(d *openapi.Document, cfg Config) error {
 	threshold := 1.0
 	for {
 		for {
-			canonicals, err := deduplicateSchemasAtThreshold(d, threshold)
+			canonicals, err := deduplicateSchemasAtThreshold(d, threshold, derived)
 			if err != nil {
 				return err
 			}
@@ -76,7 +79,7 @@ func Document(d *openapi.Document, cfg Config) error {
 // deduplicateSchemasAtThreshold performs one dedup pass at the given similarity
 // threshold.  It returns the set of canonical schema names that had at least one
 // other schema merged into them (empty map means nothing was merged).
-func deduplicateSchemasAtThreshold(d *openapi.Document, threshold float64) (map[string]bool, error) {
+func deduplicateSchemasAtThreshold(d *openapi.Document, threshold float64, derived map[string]bool) (map[string]bool, error) {
 	schemas := d.Components.Schemas
 	if len(schemas) < 2 {
 		return nil, nil
@@ -87,10 +90,11 @@ func deduplicateSchemasAtThreshold(d *openapi.Document, threshold float64) (map[
 		return isBareScalar(schemas[name])
 	})
 
-	// The first of schemas that merge is the one kept: the one with the most references, else the shortest name.
+	// The first of schemas that merge is the one kept: one the specification named rather than one flatten did, else
+	// the one with the most references, else the shortest name.
 	refs := edit.CountReferences(d)
 	slices.SortStableFunc(names, func(a, b string) int {
-		return cmp.Or(cmp.Compare(refs[b], refs[a]), cmp.Compare(len(a), len(b)))
+		return cmp.Or(compareBool(derived[a], derived[b]), cmp.Compare(refs[b], refs[a]), cmp.Compare(len(a), len(b)))
 	})
 
 	// the loop below runs over every pair, so it looks schemas up by position rather than by name
