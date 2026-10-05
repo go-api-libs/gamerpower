@@ -49,6 +49,11 @@ particular ways that sample-derived schemas disagree:
 - **Arrays only ever seen empty** — `{"type": "array", "maxItems": 0}` says nothing
   about the items, so the other side's items are adopted, and item bounds widen to
   cover both sides.
+- **Tuples** — a tuple (`prefixItems`) merges position by position with a tuple of
+  its length. A sample keeps no length, so a list whose item type fits every
+  position, such as `[x, y, z]` recorded as a list of numbers, merges into each
+  position too. Any other list or tuple becomes an alternative beside it in a
+  `oneOf`, and later samples go to the alternative of their own shape, or add one.
 - **Numeric widening** — an integer in one sample and a floating-point number in
   another merge to a number.
 - **Dates in two encodings** — a value seen as a date-time string in one sample and

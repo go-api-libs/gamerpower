@@ -229,6 +229,8 @@ type Schema struct {
 	Streamed bool `json:"streamed,omitzero"`
 	// MemberDecoder is set for a struct that decodes one member at a time, as an alternative of a streamed union.
 	MemberDecoder bool `json:"memberDecoder,omitzero"`
+	// Tagged is set for a struct made from a tagged union, whose methods check that only the member the tag names is set.
+	Tagged *Tagged `json:"tagged,omitzero"`
 }
 
 // AllOfUnion is the union part of an allOf.
@@ -557,9 +559,14 @@ func (op Operation) BaseURLExpr() string {
 		op.BaseURL.Scheme, op.BaseURL.Host, cmp.Or(op.BaseURL.Path, "/"))
 }
 
+// HasTagged reports whether a generated type is a [Tagged] struct, needing the helpers that check one.
+func (doc Document) HasTagged() bool {
+	return slices.ContainsFunc(doc.Schemas, func(s Schema) bool { return s.Tagged != nil })
+}
+
 // NeedsJSONHelpers reports whether a generated type decodes its alternatives itself, needing the JSON helpers.
 func (doc Document) NeedsJSONHelpers() bool {
 	return slices.ContainsFunc(doc.Schemas, func(s Schema) bool {
-		return s.Discriminator != "" || s.AllOfUnion != nil && s.Unimplemented == "" || s.MemberDecoder
+		return s.Discriminator != "" || s.AllOfUnion != nil && s.Unimplemented == "" || s.MemberDecoder || s.Tagged != nil
 	})
 }

@@ -205,12 +205,12 @@ func countSchemaUses(doc *openapi.Document) (map[string]int, error) {
 }
 
 // isUnion reports whether s is a union with a type of its own: a oneOf or anyOf, not one collapsed to time.Time or to
-// a pointer.
+// a pointer, nor made a [Tagged] struct.
 func isUnion(s *openapi.Schema) bool {
 	s = deref(s)
 
 	return s != nil && s.Type == "" && (len(s.OneOf) > 0 || len(s.AnyOf) > 0) &&
-		!isDateTimeOrIntegerOneOf(s) && nullableVariant(s) == nil
+		!isDateTimeOrIntegerOneOf(s) && nullableVariant(s) == nil && !isTaggedUnion(s)
 }
 
 // alternatives returns the alternatives of the union s.
@@ -374,7 +374,7 @@ func fromAllOfSchema(name string, s *openapi.Schema, uses map[string]int, folded
 		return nil
 	}
 
-	var unions []*openapi.Schema
+	var unions, tagged []*openapi.Schema
 
 	for _, entry := range s.AllOf {
 		part := deref(entry)
@@ -387,6 +387,8 @@ func fromAllOfSchema(name string, s *openapi.Schema, uses map[string]int, folded
 			}
 
 			out.Fields = append(out.Fields, Field{Type: typeName.String(), Embedded: true})
+		case isTaggedUnion(part):
+			tagged = append(tagged, entry)
 		case len(part.OneOf) > 0 || len(part.AnyOf) > 0:
 			if entry.Ref == nil {
 				out.Unimplemented = "an allOf with an inline union"
@@ -419,12 +421,13 @@ func fromAllOfSchema(name string, s *openapi.Schema, uses map[string]int, folded
 		}
 	}
 
-	switch len(unions) {
-	case 0:
-		return out, nil
-	case 1:
-	default:
+	switch {
+	case len(unions)+len(tagged) > 1:
 		out.Unimplemented = "an allOf of more than one union"
+		return out, nil
+	case len(tagged) == 1:
+		return foldTagged(out, tagged[0], uses, folded)
+	case len(unions) == 0:
 		return out, nil
 	}
 
@@ -474,6 +477,59 @@ func fromAllOfSchema(name string, s *openapi.Schema, uses map[string]int, folded
 	return out, nil
 }
 
+// foldTagged adds the fields of entry, a union that is a [Tagged] struct, to out, the struct of an allOf it is part of,
+// so that out checks its members as the union's struct would.
+func foldTagged(out *Schema, entry *openapi.Schema, uses map[string]int, folded map[string]bool) (*Schema, error) {
+	u := deref(entry)
+	alts := alternatives(u)
+
+	shape, _ := taggedUnion(u, alts)
+
+	fields, tagged, ok, err := taggedFields(shape, out.Fields)
+	if err != nil {
+		return nil, err
+	}
+
+	// a member an embedded part declares has no field of out's own to check
+	declared := map[string]bool{}
+	for _, f := range out.Fields {
+		declared[f.JSONName] = true
+	}
+
+	for _, f := range fields {
+		if slices.Contains(out.Members, f.JSONName) && !declared[f.JSONName] {
+			ok = false
+		}
+	}
+
+	if ok && !declared[tagged.Tag] && slices.Contains(out.Members, tagged.Tag) {
+		ok = false
+	}
+
+	if !ok {
+		out.Unimplemented = "an allOf whose tagged union's members clash with its other parts"
+		return out, nil
+	}
+
+	for _, f := range fields {
+		out.Members = append(out.Members, f.JSONName)
+	}
+
+	out.Fields = append(out.Fields, fields...)
+	out.Tagged = tagged
+
+	slices.Sort(out.Members)
+	out.Members = slices.Compact(out.Members)
+
+	if entry.Ref != nil && uses[entry.Ref.Identifier] == 1 {
+		folded[entry.Ref.Identifier] = true
+	}
+
+	foldAlternatives(shape, uses, folded)
+
+	return out, nil
+}
+
 // markStreaming decides which unions decode as they read, by a discriminator that comes first: those whose every
 // alternative is a struct able to decode one member at a time. It marks those structs, and the parts they embed, as
 // needing that method.
@@ -493,10 +549,13 @@ func markStreaming(schemas []Schema) {
 
 		seen[name] = true
 
-		switch s.Kind {
-		case SchemaKindStruct:
+		// a Tagged struct checks its members once all are decoded, so it decodes as a whole
+		switch {
+		case s.Tagged != nil:
+			return false
+		case s.Kind == SchemaKindStruct:
 			return true
-		case SchemaKindAllOf:
+		case s.Kind == SchemaKindAllOf:
 			if s.Unimplemented != "" {
 				return false
 			}

@@ -74,6 +74,19 @@ func mergeIfOneOf(a, b *openapi.Schema) (handled bool, err error) {
 	// if a already represents multiple possible shapes, merge b into
 	// whichever alternative it matches
 	if alts, field := union(a); len(alts) > 0 {
+		if newArrayShape(alts, b) {
+			c := *b
+			c.Title, c.Description = "", ""
+
+			if field == "oneOf" {
+				a.OneOf = append(a.OneOf, &c)
+			} else {
+				a.AnyOf = append(a.AnyOf, &c)
+			}
+
+			return true, nil
+		}
+
 		return true, mergeAlternatives(alts, field, b)
 	}
 
@@ -93,6 +106,31 @@ func mergeIfOneOf(a, b *openapi.Schema) (handled bool, err error) {
 	}
 
 	return false, nil
+}
+
+// newArrayShape reports whether b is an array of a shape, list or tuple of a length, that no array among alts has,
+// which then needs an alternative of its own beside them, as merging it into one would nest another union.
+func newArrayShape(alts openapi.SchemaList, b *openapi.Schema) bool {
+	if b.Type != openapi.TypeArray {
+		return false
+	}
+
+	arrays := 0
+
+	for _, alt := range alts {
+		alt = deref(alt)
+		if alt.Type != openapi.TypeArray {
+			continue
+		}
+
+		if oneOfBranchMatches(alt, b, false) {
+			return false
+		}
+
+		arrays++
+	}
+
+	return arrays > 0
 }
 
 // effectiveType is a.Type, or the common object type its allOf resolves to
@@ -338,10 +376,53 @@ func mergeArrayItems(a, b *openapi.Schema) error {
 		}
 
 		return nil
+	case len(b.PrefixItems) == 0 && fitsEveryPosition(a.PrefixItems, b.Items):
+		// a sample keeps no length, so a list whose items fit each position may be the tuple
+		for i, ai := range a.PrefixItems {
+			item, err := cloneSchema(b.Items)
+			if err != nil {
+				return err
+			}
+
+			if err := Schema(deref(ai), item, false); err != nil {
+				return &errpath.ErrField{Field: "prefixItems", Err: &errpath.ErrIndex{Index: i, Err: err}}
+			}
+		}
+
+		return nil
 	default:
 		mergeArrayShapeMismatch(a, b)
 		return nil
 	}
+}
+
+// fitsEveryPosition reports whether item, the items of a list, has the type of every position of a tuple, or is an
+// integer where a position is a number.
+func fitsEveryPosition(positions openapi.SchemaList, item *openapi.Schema) bool {
+	if item == nil || item.Ref != nil || item.Type == "" {
+		return false
+	}
+
+	return !slices.ContainsFunc(positions, func(p *openapi.Schema) bool {
+		p = deref(p)
+
+		return p == nil || p.Type != item.Type && (p.Type != openapi.TypeNumber || item.Type != openapi.TypeInteger)
+	})
+}
+
+// cloneSchema is a deep copy of s.
+func cloneSchema(s *openapi.Schema) (*openapi.Schema, error) {
+	data, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+
+	clone := &openapi.Schema{}
+	if err := json.Unmarshal(data, clone); err != nil {
+		return nil, err
+	}
+
+	return clone, nil
 }
 
 // mergeItemBounds widens a's bounds on the number of items to cover b's too: an unbounded side leaves the result unbounded.
@@ -890,11 +971,16 @@ func oneOfBranchMatches(alt, b *openapi.Schema, anyFormat bool) bool {
 		return false
 	}
 
-	if alt.Type == openapi.TypeString {
+	switch alt.Type {
+	case openapi.TypeString:
 		return alt.Format == b.Format || anyFormat && alt.Format == ""
+	case openapi.TypeArray:
+		// a list or a tuple only where the alternative has that shape, or merging it would nest another union
+		return len(alt.PrefixItems) == len(b.PrefixItems) ||
+			len(b.PrefixItems) == 0 && fitsEveryPosition(alt.PrefixItems, b.Items)
+	default:
+		return true
 	}
-
-	return true
 }
 
 // mergeDateTimeOrTimestamp merges a value that appears as a date-time string in

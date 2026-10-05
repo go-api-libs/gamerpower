@@ -379,6 +379,10 @@ func fromSchema(name string, s *openapi.Schema, uses map[string]int, folded map[
 			return fromAllOfSchema(name, s, uses, folded)
 		}
 
+		if t, err := fromTaggedUnion(name, s, uses, folded); t != nil || err != nil {
+			return t, err
+		}
+
 		if len(s.OneOf) > 0 {
 			return fromUnionSchema(name, s, true)
 		}

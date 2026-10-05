@@ -67,6 +67,16 @@ How the specification maps onto Go:
   its own counts by its alternatives, however deep, so its leaves are chosen the same
   way. Encoding writes the discriminator first, with the value of the alternative
   set, and refuses a different one. Otherwise each alternative is tried in turn.
+- **Tagged unions** — a union whose alternatives differ only in a tag, a member
+  each fixes to a string of its own, and in at most one member named after that
+  value, such as Notion's blocks (`{"type": "paragraph", "paragraph": {...}}`),
+  becomes one struct instead: the members all alternatives share, the tag, and
+  one optional field per alternative's member. Its methods check that only the
+  member the tag names is set, and that it is where its alternative requires it,
+  unless it can be `null`. Encoding with the tag left empty sends the value whose
+  member is set. Alternatives that are unions tagged alike count by their own
+  alternatives, and as part of an `allOf` the union's fields join the struct's.
+  Alternatives nothing else refers to get no type of their own.
 - **allOf** — each part referenced by this schema alone is folded into its fields;
   a part other schemas share stays an embedded type. A union among the parts is a
   field of its own, decoded by the struct's methods: the fields and the chosen
