@@ -426,6 +426,11 @@ func fromAllOfSchema(name string, s *openapi.Schema, uses map[string]int, folded
 		}
 	}
 
+	// the schema's own properties beside its allOf are members as much as its parts'
+	if err := addProperties(s); err != nil {
+		return nil, err
+	}
+
 	switch {
 	case len(unions)+len(tagged) > 1:
 		out.Unimplemented = "an allOf of more than one union"

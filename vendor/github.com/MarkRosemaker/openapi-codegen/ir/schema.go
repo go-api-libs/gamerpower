@@ -354,6 +354,10 @@ func fromSchema(name string, s *openapi.Schema, uses map[string]int, folded map[
 			}, nil
 		}
 
+		if len(s.AllOf) > 0 {
+			return fromAllOfSchema(name, s, uses, folded)
+		}
+
 		return fromObjectSchema(name, s)
 	case openapi.TypeString, openapi.TypeInteger, openapi.TypeNumber, openapi.TypeBoolean:
 		if len(s.Enum) > 0 {
