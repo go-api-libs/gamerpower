@@ -70,7 +70,7 @@ What it infers:
 - **Binary bodies** — a request or response body that is not text, such as a
   zip, a PDF, an image or a video, is documented by its media type as a string
   of bytes (`{"type": "string", "format": "binary"}`), from its headers alone.
-- **Schema formats** — UUID, URI, email, date-time, IPv4, IPv6 are detected
+- **Schema formats** — UUID, URI, email, date-time, date, IPv4, IPv6 are detected
   automatically from string values.
 - **Nulls and empty arrays** — a value only ever seen as `null` has the type
   `null`, and becomes nullable once it is seen with a real type

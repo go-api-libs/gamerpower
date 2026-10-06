@@ -67,7 +67,7 @@ func (doc Document) minimalLiteral(goType string, seen map[string]bool) (string,
 			parts = append(parts, t.Field+": "+strconv.Quote(v.Value))
 
 			for _, m := range t.Members {
-				if !slices.Contains(v.Members, TaggedOwn{Name: m.Name, Required: true}) {
+				if !slices.Contains(v.Members, TaggedOwn{Name: m.Name, Required: true}) { // null cannot be told from unset
 					continue
 				}
 

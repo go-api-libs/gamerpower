@@ -13,7 +13,7 @@ github.com/MarkRosemaker/jsonutil
 # github.com/MarkRosemaker/openapi v0.0.0-20261005183413-2a3bd56f42a1
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi
-# github.com/MarkRosemaker/openapi-codegen v0.0.0-20261005221056-b8c796a8bb6f
+# github.com/MarkRosemaker/openapi-codegen v0.0.0-20261006161203-db7f5c92381a
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-codegen
 github.com/MarkRosemaker/openapi-codegen/cmd/openapi-codegen
@@ -23,24 +23,24 @@ github.com/MarkRosemaker/openapi-codegen/render
 # github.com/MarkRosemaker/openapi-compare v0.0.0-20261005183439-4c528983edcf
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-compare/schema
-# github.com/MarkRosemaker/openapi-compress v0.0.0-20261005184003-e86091c230b7
+# github.com/MarkRosemaker/openapi-compress v0.0.0-20261006162409-9e9d8797f8bb
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-compress
 github.com/MarkRosemaker/openapi-compress/cmd/openapi-compress
 # github.com/MarkRosemaker/openapi-edit v0.0.0-20261005183438-5084b9673f29
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-edit
-# github.com/MarkRosemaker/openapi-enrich v0.0.0-20261005220156-d302a4c4857b
+# github.com/MarkRosemaker/openapi-enrich v0.0.0-20261006161725-2683d182abbf
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-enrich
 github.com/MarkRosemaker/openapi-enrich/cassette
 github.com/MarkRosemaker/openapi-enrich/cmd/openapi-enrich
 github.com/MarkRosemaker/openapi-enrich/recorder
-# github.com/MarkRosemaker/openapi-flatten v0.0.0-20261005183538-24419f585666
+# github.com/MarkRosemaker/openapi-flatten v0.0.0-20261006161745-303b7b474f65
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-flatten
 github.com/MarkRosemaker/openapi-flatten/cmd/openapi-flatten
-# github.com/MarkRosemaker/openapi-merge v0.0.0-20261005204934-c05df42449a2
+# github.com/MarkRosemaker/openapi-merge v0.0.0-20261006161412-db0e153b0b83
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-merge
 # github.com/MarkRosemaker/ordmap v0.0.0-20261005183330-99e2b69a0bc0

@@ -36,10 +36,24 @@ type TaggedValue struct {
 	Members []TaggedOwn `json:"members,omitempty"`
 }
 
-// TaggedOwn is a member of an alternative's own, by JSON name, and whether the alternative requires it.
+// TaggedOwn is a member of an alternative's own, by JSON name, whether the alternative requires it, and whether it
+// may be null, which leaves its field as if it were left out.
 type TaggedOwn struct {
 	Name     string `json:"name,omitzero"`
 	Required bool   `json:"required,omitzero"`
+	Nullable bool   `json:"nullable,omitzero"`
+}
+
+// Need is how the alternative needs the member, by the name of the generated constant.
+func (o TaggedOwn) Need() string {
+	switch {
+	case !o.Required:
+		return "jsonTagOptional"
+	case o.Nullable:
+		return "jsonTagRequiredOrNull"
+	default:
+		return "jsonTagRequired"
+	}
 }
 
 // TaggedMember is the field of a member of an alternative's own.
@@ -379,9 +393,8 @@ func taggedFields(shape *taggedShape, existing []Field) ([]Field, *Tagged, bool,
 				return nil, nil, false, fmt.Errorf("property %q: %w", p.name, err)
 			}
 
-			// null leaves the field as if it were left out, so a member that can be null may be left out too
 			nullable := tp.IsPointer || nullableVariant(deref(own)) != nil
-			tv.Members = append(tv.Members, TaggedOwn{Name: p.name, Required: shape.ownRequired[i][p.name] && !nullable})
+			tv.Members = append(tv.Members, TaggedOwn{Name: p.name, Required: shape.ownRequired[i][p.name], Nullable: nullable})
 
 			if declared[p.name] {
 				continue

@@ -58,6 +58,11 @@ func Schema(a, b *openapi.Schema, isParam bool) error {
 		}
 	}
 
+	if isDateAndDateTime(a, b) {
+		mergeDateOrDateTime(a, b)
+		return nil
+	}
+
 	if err := reconcileFormats(a, b); err != nil {
 		return err
 	}
@@ -985,6 +990,35 @@ func oneOfBranchMatches(alt, b *openapi.Schema, anyFormat bool) bool {
 	default:
 		return true
 	}
+}
+
+// isDateAndDateTime reports whether one of a and b is a date string and the other a date-time string.
+func isDateAndDateTime(a, b *openapi.Schema) bool {
+	return a.Type == openapi.TypeString && b.Type == openapi.TypeString &&
+		(a.Format == openapi.FormatDate && b.Format == openapi.FormatDateTime ||
+			a.Format == openapi.FormatDateTime && b.Format == openapi.FormatDate)
+}
+
+// mergeDateOrDateTime merges a value seen as a date in one sample and as a date-time in another, such as Notion's
+// date start, into a oneOf of the two, the date first, storing the result in both a and b.
+func mergeDateOrDateTime(a, b *openapi.Schema) {
+	date, dateTime := a, b
+	if a.Format == openapi.FormatDateTime {
+		date, dateTime = b, a
+	}
+
+	dateCopy, dateTimeCopy := *date, *dateTime
+	dateCopy.Title, dateCopy.Description = "", ""
+	dateTimeCopy.Title, dateTimeCopy.Description = "", ""
+
+	merged := openapi.Schema{
+		Title:       a.Title,
+		Description: a.Description,
+		OneOf:       openapi.SchemaList{&dateCopy, &dateTimeCopy},
+	}
+
+	a.Replace(&merged)
+	b.Replace(&merged)
 }
 
 // mergeDateTimeOrTimestamp merges a value that appears as a date-time string in

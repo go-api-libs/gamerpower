@@ -296,7 +296,7 @@ func cloneSchema(s *openapi.Schema) (*openapi.Schema, error) {
 }
 
 // stringFormat detects the special format for a string value.
-// It tries in order: UUID, URI, Email, DateTime (RFC3339), IPv4/IPv6.
+// It tries in order: UUID, URI, Email, DateTime (RFC3339), Date (2006-01-02), IPv4/IPv6.
 func stringFormat(s string) openapi.Format {
 	if isUUID(s) {
 		return openapi.FormatUUID
@@ -312,6 +312,10 @@ func stringFormat(s string) openapi.Format {
 
 	if _, err := time.Parse(time.RFC3339, s); err == nil {
 		return openapi.FormatDateTime
+	}
+
+	if _, err := time.Parse(time.DateOnly, s); err == nil {
+		return openapi.FormatDate
 	}
 
 	if ip := net.ParseIP(s); ip != nil {

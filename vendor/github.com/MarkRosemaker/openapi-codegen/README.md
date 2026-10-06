@@ -77,8 +77,9 @@ How the specification maps onto Go:
   tag is an enum type of its values, named after the struct and the tag (such as
   `BlockType` with `BlockTypeChildDatabase`), unless a part of an `allOf` types it
   already or a name is taken. The methods check that only members of the
-  alternative the tag names are set, and that those it requires are, unless they
-  can be `null`. Encoding with the tag left empty sends the value whose member is
+  alternative the tag names are set, and that those it requires are there, as
+  `null` if need be: decoding checks the members the object holds, encoding the
+  fields set, where a member that may be `null` cannot be told from one left out. Encoding with the tag left empty sends the value whose member is
   set, and where an alternative may leave the tag out, decoding infers it so. Alternatives that are unions tagged alike count by their own alternatives,
   and as part of an `allOf` the union's fields join the struct's. A tagged struct
   that is an alternative of another union, there or in an `allOf`, is chosen by
