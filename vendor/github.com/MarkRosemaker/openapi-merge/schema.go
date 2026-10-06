@@ -344,6 +344,8 @@ func mergeByType(a, b *openapi.Schema, tp openapi.DataType) error {
 	switch tp {
 	case openapi.TypeString: // nothing left to do here; enum handled above
 	case openapi.TypeObject:
+		mergeRequired(a, b)
+
 		if err := mergeObjectProperties(a, b); err != nil {
 			return err
 		}
@@ -545,6 +547,45 @@ func mergeObjectProperties(a, b *openapi.Schema) error {
 	}
 
 	return nil
+}
+
+// mergeRequired keeps a requiring only what b requires too, as a value without a member makes it optional: a recorded
+// sample requires every member it has. What a's allOf parts require is narrowed the same way.
+func mergeRequired(a, b *openapi.Schema) {
+	byB := requiredOf(b)
+
+	var narrow func(s *openapi.Schema)
+
+	narrow = func(s *openapi.Schema) {
+		if s.Required != nil {
+			s.Required = slices.DeleteFunc(s.Required, func(name string) bool { return !byB[name] })
+			if len(s.Required) == 0 {
+				s.Required = nil
+			}
+		}
+
+		for _, part := range s.AllOf {
+			if part.Ref == nil { // a referenced part is a schema of its own that others may use as it is
+				narrow(part)
+			}
+		}
+	}
+
+	narrow(a)
+}
+
+// requiredOf returns the members s requires, its allOf parts' included.
+func requiredOf(s *openapi.Schema) map[string]bool {
+	out := map[string]bool{}
+	for _, name := range s.Required {
+		out[name] = true
+	}
+
+	for _, part := range s.AllOf {
+		maps.Copy(out, requiredOf(deref(part)))
+	}
+
+	return out
 }
 
 // mergeAdditionalProperties merges a non-schema a with b: absent says nothing, a schema beats a boolean, and true beats false.
@@ -750,7 +791,7 @@ func matchingAlternative(alts openapi.SchemaList, b *openapi.Schema) (int, error
 func matchAlternative(
 	alts openapi.SchemaList, b *openapi.Schema, anyFormat bool, discriminators map[string]bool,
 ) (idx, fit int, pinned, ok bool) {
-	best, bestFit, fallback := -1, -1, -1
+	best, bestFit, fallback, fallbackFit := -1, -1, -1, -1
 
 	for i, alt := range alts {
 		alt = deref(alt)
@@ -778,8 +819,9 @@ func matchAlternative(
 
 		values := pinnedProperties(alt)
 		if len(values) == 0 {
-			if fallback == -1 {
-				fallback = i
+			// of the branches that pin nothing, the one that fits b best, not merely the first
+			if f := fitOf(alt, b); fallback == -1 || f > fallbackFit {
+				fallback, fallbackFit = i, f
 			}
 
 			continue
@@ -803,6 +845,32 @@ func matchAlternative(
 	}
 
 	return fallback, 0, false, fallback != -1
+}
+
+// fitOf is how well b fits the branch s: twice the number of b's properties s declares, and one more if b has every
+// property s requires, which tells apart branches that declare as many.
+func fitOf(s, b *openapi.Schema) int {
+	f := 2 * declared(s, b)
+	if !lacksRequired(s, b) {
+		f++
+	}
+
+	return f
+}
+
+// lacksRequired reports whether b, an object, lacks a property the object s requires.
+func lacksRequired(s, b *openapi.Schema) bool {
+	if b.Type != openapi.TypeObject {
+		return false
+	}
+
+	for name := range requiredOf(s) {
+		if _, ok := b.Properties[name]; !ok {
+			return true
+		}
+	}
+
+	return false
 }
 
 // declared is the number of b's properties s, or the parts of its allOf, declares.

@@ -43,6 +43,9 @@ JSON path at which they conflict.
 Beyond combining properties and widening optionality, the merge handles the
 particular ways that sample-derived schemas disagree:
 
+- **Required** — an object requires only what both sides require: a value without
+  a member makes it optional, as a recorded sample requires every member it has.
+  What an inline `allOf` part requires is narrowed the same way.
 - **Null** — a value observed only as `null` has the type `null`. Merged with a
   real type, the result is that type, made nullable (`["string", "null"]`), rather
   than a conflict.
@@ -68,7 +71,9 @@ particular ways that sample-derived schemas disagree:
   one-value `enum`, such as `"type": {"const": "select"}` — the sample has, so a
   sample never lands in a sibling's branch; of several that match, it is the one
   that declares the most of the sample's properties, so a full object wins over
-  its partial form. With none that matches, the merge
+  its partial form. Of branches that pin nothing, it is likewise the one that
+  declares the most of the sample's properties, and, of those that declare as
+  many, one whose required properties the sample has. With none that matches, the merge
   fails and names the values it got. A branch that is itself a union matches as
   its own branches do, an integer matches a number branch, and a string without
   a format matches when no branch has the sample's.
