@@ -86,7 +86,12 @@ func mergeSchemas(a, b *openapi.Schema) {
 		}
 	}
 
-	// Required = intersection: only keep fields that are required in both.
+	intersectRequired(a, b)
+}
+
+// intersectRequired keeps a requiring only the fields b requires too. Two schemas of the same shape may still differ
+// in this, as the shape leaves out what is required.
+func intersectRequired(a, b *openapi.Schema) {
 	bRequired := make(map[string]bool, len(b.Required))
 	for _, r := range b.Required {
 		bRequired[r] = true
@@ -97,6 +102,10 @@ func mergeSchemas(a, b *openapi.Schema) {
 		if bRequired[r] {
 			kept = append(kept, r)
 		}
+	}
+
+	if len(kept) == 0 {
+		kept = nil
 	}
 
 	a.Required = kept

@@ -149,6 +149,8 @@ func deduplicateSchemasAtThreshold(d *openapi.Document, threshold float64, deriv
 			if sim < 1.0 {
 				// Not exactly equal: widen schemaA to also cover schemaB.
 				mergeSchemas(schemaA, schemaB)
+			} else {
+				intersectRequired(schemaA, schemaB)
 			}
 
 			fillExamples(schemaA, schemaB)

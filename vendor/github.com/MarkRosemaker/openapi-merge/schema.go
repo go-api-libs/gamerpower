@@ -992,7 +992,7 @@ func mergeIfUnionInAllOf(a, b *openapi.Schema) (handled bool, err error) {
 			declared[name] = true
 		}
 
-		if err := Schema(part, &openapi.Schema{Type: openapi.TypeObject, Properties: props}, false); err != nil {
+		if err := Schema(part, &openapi.Schema{Type: openapi.TypeObject, Properties: props, Required: requiredAmong(b, props)}, false); err != nil {
 			return true, &errpath.ErrField{Field: "allOf", Err: &errpath.ErrIndex{Index: i, Err: err}}
 		}
 	}
@@ -1017,6 +1017,7 @@ func mergeIfUnionInAllOf(a, b *openapi.Schema) (handled bool, err error) {
 		Type:       openapi.TypeObject,
 		Properties: propertiesOf(b, func(name string) bool { return !declared[name] }),
 	}
+	rest.Required = requiredAmong(b, rest.Properties)
 
 	if err := mergeIntoAlternative(deref(alts[idx]), rest); err != nil {
 		return true, &errpath.ErrField{Field: "allOf", Err: &errpath.ErrIndex{
@@ -1025,6 +1026,22 @@ func mergeIfUnionInAllOf(a, b *openapi.Schema) (handled bool, err error) {
 	}
 
 	return true, nil
+}
+
+// requiredAmong is what b requires of props, a part of b's properties, so that a part merged with them is narrowed
+// only by what b leaves out.
+func requiredAmong(b *openapi.Schema, props openapi.Schemas) []string {
+	var out []string
+
+	for name := range requiredOf(b) {
+		if _, ok := props[name]; ok {
+			out = append(out, name)
+		}
+	}
+
+	slices.Sort(out)
+
+	return out
 }
 
 // propertiesOf is b's properties that keep accepts, in b's order.
