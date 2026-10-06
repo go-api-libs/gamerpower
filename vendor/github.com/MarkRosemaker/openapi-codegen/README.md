@@ -66,7 +66,10 @@ How the specification maps onto Go:
   unknown value, or a value without that member, is an error. An alternative that is a union of
   its own counts by its alternatives, however deep, so its leaves are chosen the same
   way. Encoding writes the discriminator first, with the value of the alternative
-  set, and refuses a different one. Otherwise each alternative is tried in turn.
+  set, and refuses a different one. Otherwise each alternative is tried in turn,
+  and only where the value has the members it requires and the values it pins
+  (`const` or a one-value `enum`), which decoding a struct alone does not check,
+  strict or lenient.
 - **Tagged unions** — a union whose alternatives differ only in a tag, a member
   each fixes to a string of its own, and in members of their own, such as
   Notion's blocks (`{"type": "paragraph", "paragraph": {...}}`), becomes one
@@ -117,6 +120,12 @@ How the specification maps onto Go:
   it holds its zero value: nil for a pointer, a slice or a map, so an empty one
   is still sent. A required field is always sent, `""`, `0` and `false`
   included.
+- **Read-only and write-only** — a property only responses carry (`readOnly`)
+  or only requests (`writeOnly`) is never required, so a value that leaves it
+  out still decodes, and a union's alternative is chosen without it. The client
+  leaves read-only members out of a request body, and the server leaves
+  write-only members out of a response, as their fields hold them or not, through
+  unions and embedded parts alike; any other encoding keeps them.
 - **Null** — a schema that is only ever `null` is `*struct{}`, and "X or null"
   is `X`, a pointer to `X` only by the rule for fields above, so that null and
   the zero value can differ, or where `X` decodes itself, such as a union or a

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"go/token"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -330,6 +331,7 @@ func fromComponentSchemas(schemas openapi.Schemas, uses map[string]int) ([]Schem
 	}
 
 	pointRecursiveFields(kept)
+	markOneWayFields(kept)
 	markStreaming(kept)
 	typeTags(kept)
 
@@ -515,7 +517,7 @@ func getField(jsonName string, propRef *openapi.Schema, requiredSet map[string]b
 
 	v := deref(propRef)
 
-	required := requiredSet[jsonName]
+	required := requiredSet[jsonName] && !oneWay(propRef)
 	if !required && zeroIsAValue(propRef, goType) {
 		goType.IsPointer = true
 	}
@@ -532,6 +534,8 @@ func getField(jsonName string, propRef *openapi.Schema, requiredSet map[string]b
 		JSONTag:         buildJSONTag(jsonName, required),
 		Description:     cmp.Or(propRef.Description, v.Description),
 		Required:        required,
+		ReadOnly:        propRef.ReadOnly || v.ReadOnly,
+		WriteOnly:       propRef.WriteOnly || v.WriteOnly,
 		IsDateTimeOrInt: isDateTimeOrIntegerOneOf(v),
 		IsUnixTime:      goType.Name == "time.Time" && v.Type == openapi.TypeInteger,
 	}, nil
@@ -858,6 +862,21 @@ func buildJSONTag(jsonName string, required bool) string {
 	return fmt.Sprintf(`json:"%s,omitzero"`, jsonName)
 }
 
+// oneWay reports whether only one direction carries the property p: responses alone if it is readOnly, requests alone
+// if it is writeOnly. Neither requires it then, since the other leaves it out.
+func oneWay(p *openapi.Schema) bool {
+	v := deref(p)
+	return p.ReadOnly || p.WriteOnly || v != nil && (v.ReadOnly || v.WriteOnly)
+}
+
+// requiredOf is what s requires of every value: its required properties but those only one direction carries.
+func requiredOf(s *openapi.Schema) []string {
+	return slices.DeleteFunc(slices.Clone(s.Required), func(name string) bool {
+		p, ok := s.Properties[name]
+		return ok && oneWay(p)
+	})
+}
+
 // deref is the schema s stands for: the one it refers to, if it is a reference.
 func deref(s *openapi.Schema) *openapi.Schema {
 	if s != nil && s.Ref != nil {
@@ -887,4 +906,42 @@ func componentGoName(name string, s *openapi.Schema) string {
 	return reNotInGoName.ReplaceAllStringFunc(name, func(m string) string {
 		return strings.ToUpper(reNotInGoName.ReplaceAllString(m, "$1"))
 	})
+}
+
+// markOneWayFields lists each struct's readOnly and writeOnly fields, its own and those of the parts it embeds, which
+// encoding inlines, so that the struct's encoding leaves them out.
+func markOneWayFields(schemas []Schema) {
+	byName := make(map[string]*Schema, len(schemas))
+	for i := range schemas {
+		byName[schemas[i].Name] = &schemas[i]
+	}
+
+	var paths func(s *Schema, of func(Field) bool, seen map[string]bool) []string
+
+	paths = func(s *Schema, of func(Field) bool, seen map[string]bool) []string {
+		var out []string
+
+		for _, f := range s.Fields {
+			switch {
+			case !f.Embedded:
+				if of(f) {
+					out = append(out, f.Name)
+				}
+			case !strings.HasPrefix(f.Type, "*") && byName[f.Type] != nil && !seen[f.Type]:
+				// a pointer to a part is shared with the caller, so it is not changed
+				seen[f.Type] = true
+				for _, p := range paths(byName[f.Type], of, seen) {
+					out = append(out, f.Type+"."+p)
+				}
+			}
+		}
+
+		return out
+	}
+
+	for i := range schemas {
+		s := &schemas[i]
+		s.ReadOnly = paths(s, func(f Field) bool { return f.ReadOnly }, map[string]bool{s.Name: true})
+		s.WriteOnly = paths(s, func(f Field) bool { return f.WriteOnly }, map[string]bool{s.Name: true})
+	}
 }

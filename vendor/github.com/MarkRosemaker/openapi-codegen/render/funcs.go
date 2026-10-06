@@ -26,6 +26,7 @@ func templateFuncs() template.FuncMap {
 		"add":        func(a, b int) int { return a + b },
 		"sub":        func(a, b int) int { return a - b },
 		"last":       func(i, n int) bool { return i == n-1 },
+		"list":       func(v ...any) []any { return v },
 		"titleCase": func(s string) string {
 			if s == "" {
 				return s

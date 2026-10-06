@@ -76,7 +76,7 @@ func zeroInRange(s *openapi.Schema) bool {
 
 // hasRequired reports whether s, or a schema it extends through allOf, requires a property.
 func hasRequired(s *openapi.Schema) bool {
-	return len(s.Required) > 0 || slices.ContainsFunc(s.AllOf, func(p *openapi.Schema) bool {
+	return len(requiredOf(s)) > 0 || slices.ContainsFunc(s.AllOf, func(p *openapi.Schema) bool {
 		p = deref(p)
 		return p != nil && hasRequired(p)
 	})

@@ -19,15 +19,7 @@ var jsonOpts = json.JoinOptions(
 		json.RejectUnknownMembers(true),
 		{{- if or .HasURLFields .HasDurationFields .HasUnixTimeFields }}
 		json.WithMarshalers(json.JoinMarshalers(
-			{{- if .HasURLFields }}
-			json.MarshalToFunc(jsonutil.URLMarshal),
-			{{- end }}
-			{{- if .HasDurationFields }}
-			json.MarshalToFunc(jsonutil.DurationMarshalIntSeconds),
-			{{- end }}
-			{{- if .HasUnixTimeFields }}
-			json.MarshalToFunc(jsonutil.TimeMarshalIntUnix),
-			{{- end }}
+			{{- template "marshalers" . }}
 		)),
 		{{- end }}
 		{{- if or .HasURLFields .HasDateTimeOrIntFields .HasDurationFields .HasUnixTimeFields }}
@@ -52,6 +44,24 @@ var jsonOpts = json.JoinOptions(
 // jsonOptsLenient is jsonOpts accepting members the specification does not know, as debug mode decodes once a strict
 // decoding failed, and as a caller's own type of a result is decoded.
 var jsonOptsLenient = json.JoinOptions(jsonOpts, json.RejectUnknownMembers(false))
+{{- if .HasReadOnly }}
+
+// jsonOptsRequest is jsonOpts for a request body: it leaves out the members only responses carry, which the
+// specification marks readOnly.
+var jsonOptsRequest = json.JoinOptions(jsonOpts, json.WithMarshalers(json.JoinMarshalers(
+	{{- template "marshalers" . }}
+	{{- range .Schemas }}{{ template "leaveOut" (list . .ReadOnly) }}{{ end }}
+)))
+{{- end }}
+{{- if .HasWriteOnly }}
+
+// jsonOptsResponse is jsonOpts for a response body: it leaves out the members only requests carry, which the
+// specification marks writeOnly.
+var jsonOptsResponse = json.JoinOptions(jsonOpts, json.WithMarshalers(json.JoinMarshalers(
+	{{- template "marshalers" . }}
+	{{- range .Schemas }}{{ template "leaveOut" (list . .WriteOnly) }}{{ end }}
+)))
+{{- end }}
 
 {{range .Operations}}{{- if or .QueryParams .HeaderParams }}
 // {{.ParamStructName}} holds the query parameters for {{.Name}}.
@@ -155,6 +165,7 @@ var variantsOf{{$typeName}} = []jsonVariant{
 		value:    {{ printf "%q" .Value }},
 		members:  map[string]bool{ {{- range .Members }}{{ printf "%q" . }}: true, {{ end -}} },
 		required: []string{ {{- range .Required }}{{ printf "%q" . }}, {{ end -}} },
+		pinned:   map[string]string{ {{- range .Pinned }}{{ printf "%q" .Name }}: {{ printf "%q" .Value }}, {{ end -}} },
 	},
 	{{- end }}
 }
@@ -243,7 +254,7 @@ func (v *{{$typeName}}) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 // MarshalJSONTo implements [json.MarshalerTo]. It merges the fields with each alternative of {{.FieldName}} that is set;
 // a member both write must have the same value in each.
 func (v *{{$typeName}}) MarshalJSONTo(enc *jsontext.Encoder) error {
-	out, err := json.Marshal((*fieldsOf{{$typeName}})(v), jsonOpts)
+	out, err := json.Marshal((*fieldsOf{{$typeName}})(v), jsonOptsTo(enc))
 	if err != nil {
 		return err
 	}
@@ -260,7 +271,7 @@ func (v *{{$typeName}}) MarshalJSONTo(enc *jsontext.Encoder) error {
 		tag = {{ printf "%q" .Value }}
 		{{- end }}
 
-		variant, err := json.Marshal(v.{{ $u.FieldName }}.{{ .FieldName }}, jsonOpts)
+		variant, err := json.Marshal(v.{{ $u.FieldName }}.{{ .FieldName }}, jsonOptsTo(enc))
 		if err != nil {
 			return err
 		}
@@ -384,11 +395,23 @@ func (v *{{$typeName}}) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	{{- else -}}
 	{
 	{{- end }}
+		{{- if or .Required .Pinned }}
+		// decoding checks neither the members the alternative requires nor those it pins to one value
+		required, pinned := {{ template "requiredAndPinned" . }}
+		if jsonFits(raw, required, pinned) {
+			var vv {{.Type}}
+			if err := json.Unmarshal(raw, &vv, opts); err == nil {
+				{{ .Assign "v" }}
+				matched++
+			}
+		}
+		{{- else }}
 		var vv {{.Type}}
 		if err := json.Unmarshal(raw, &vv, opts); err == nil {
 			{{ .Assign "v" }}
 			matched++
 		}
+		{{- end }}
 	}
 	{{- end}}
 
@@ -425,7 +448,7 @@ func (v *{{$typeName}}) MarshalJSONTo(enc *jsontext.Encoder) error {
 		return &json.SemanticError{Err: errors.New("no alternative set")}
 	}
 
-	out, err := json.Marshal(variant, jsonOpts)
+	out, err := json.Marshal(variant, jsonOptsTo(enc))
 	if err != nil {
 		return err
 	}
@@ -439,7 +462,7 @@ func (v *{{$typeName}}) MarshalJSONTo(enc *jsontext.Encoder) error {
 	switch {
 	{{- range .UnionVariants}}
 	case {{ .IsSet (printf "v.%s" .FieldName) }}:
-		return json.MarshalEncode(enc, v.{{.FieldName}}, jsonOpts)
+		return json.MarshalEncode(enc, v.{{.FieldName}}, jsonOptsTo(enc))
 	{{- end}}
 	}
 
@@ -531,6 +554,12 @@ func jsonOptsOf(dec *jsontext.Decoder) json.Options {
 	}
 
 	return jsonOptsLenient
+}
+
+// jsonOptsTo is jsonOpts with the options enc was given beside them, such as the marshalers that leave out what a
+// request or a response does not carry, so that what a type encodes itself passes them on.
+func jsonOptsTo(enc *jsontext.Encoder) json.Options {
+	return json.JoinOptions(jsonOpts, enc.Options())
 }
 
 // jsonUnknownName reports a member no part of the type declares, as encoding/json reports one of a struct.
@@ -1000,6 +1029,58 @@ type jsonVariant struct {
 	value    string
 	members  map[string]bool
 	required []string
+	// pinned are the members it allows one value for, written as compact JSON
+	pinned map[string]string
+}
+
+// jsonFits reports whether the JSON value raw has the members required, and those of pinned it has with the value
+// each pins, written as compact JSON. Any value fits where nothing is required or pinned.
+func jsonFits(raw jsontext.Value, required []string, pinned map[string]string) bool {
+	if len(required) == 0 && len(pinned) == 0 {
+		return true
+	}
+
+	if raw.Kind() != jsontext.KindBeginObject {
+		return false
+	}
+
+	dec := jsontext.NewDecoder(bytes.NewReader(raw))
+	if _, err := dec.ReadToken(); err != nil {
+		return false
+	}
+
+	present := map[string]bool{}
+
+	for dec.PeekKind() != jsontext.KindEndObject {
+		tok, err := dec.ReadToken()
+		if err != nil {
+			return false
+		}
+
+		name := tok.String()
+
+		val, err := dec.ReadValue()
+		if err != nil {
+			return false
+		}
+
+		present[name] = true
+
+		if want, ok := pinned[name]; ok {
+			got := val.Clone()
+			if err := got.Compact(); err != nil || string(got) != want {
+				return false
+			}
+		}
+	}
+
+	for _, r := range required {
+		if !present[r] {
+			return false
+		}
+	}
+
+	return true
 }
 
 // jsonChooseVariants returns the alternatives the JSON object raw is: the one its discriminator names, if there is
@@ -1042,10 +1123,8 @@ func jsonChooseVariants(raw jsontext.Value, discriminator string, variants []jso
 	} else {
 	variants:
 		for i, v := range variants {
-			for _, r := range v.required {
-				if !present[r] {
-					continue variants
-				}
+			if !jsonFits(raw, v.required, v.pinned) {
+				continue variants
 			}
 
 			for _, n := range names {
@@ -1243,9 +1322,13 @@ func (v *{{$s.Name}}) MarshalJSONTo(enc *jsontext.Encoder) error {
 		return err
 	}
 
-	return json.MarshalEncode(enc, (*plain)(&out), jsonOpts)
+	return json.MarshalEncode(enc, (*plain)(&out), jsonOptsTo(enc))
 }
 {{- end }}{{ end }}
+
+{{- define "requiredAndPinned" -}}
+[]string{ {{- range .Required }}{{ printf "%q" . }}, {{ end -}} }, map[string]string{ {{- range .Pinned }}{{ printf "%q" .Name }}: {{ printf "%q" .Value }}, {{ end -}} }
+{{- end }}
 
 {{- define "memberDecoder" }}
 
@@ -1268,3 +1351,31 @@ func (v *{{.Name}}) unmarshalJSONMember(dec *jsontext.Decoder, name string) (boo
 }
 {{- end }}
 
+
+{{- define "marshalers" }}
+	{{- if .HasURLFields }}
+	json.MarshalToFunc(jsonutil.URLMarshal),
+	{{- end }}
+	{{- if .HasDurationFields }}
+	json.MarshalToFunc(jsonutil.DurationMarshalIntSeconds),
+	{{- end }}
+	{{- if .HasUnixTimeFields }}
+	json.MarshalToFunc(jsonutil.TimeMarshalIntUnix),
+	{{- end }}
+{{- end }}
+
+{{- define "leaveOut" }}{{ $s := index . 0 }}{{ with index . 1 }}
+	json.MarshalToFunc(func(enc *jsontext.Encoder, v {{ $s.Name }}) error {
+		{{- range . }}
+		v.{{ . }} = {{ $s.Name }}{}.{{ . }}
+		{{- end }}
+		{{- if $s.EncodesItself }}
+
+		return v.MarshalJSONTo(enc)
+		{{- else }}
+
+		type plain {{ $s.Name }}
+		return json.MarshalEncode(enc, plain(v))
+		{{- end }}
+	}),
+{{- end }}{{ end }}

@@ -26,7 +26,7 @@ func objectShape(s *openapi.Schema) (members, required []string, ok bool) {
 		members = append(members, name)
 	}
 
-	required = slices.Clone(s.Required)
+	required = requiredOf(s)
 
 	for _, e := range s.AllOf {
 		m, r, ok := objectShape(e)
@@ -36,6 +36,11 @@ func objectShape(s *openapi.Schema) (members, required []string, ok bool) {
 
 		members, required = append(members, m...), append(required, r...)
 	}
+
+	// a part may require what another declares one way
+	required = slices.DeleteFunc(required, func(name string) bool {
+		return slices.ContainsFunc(orderedProperties(s), func(p namedSchema) bool { return p.name == name && oneWay(p.schema) })
+	})
 
 	slices.Sort(members)
 	slices.Sort(required)
@@ -256,6 +261,7 @@ func fieldVariants(variants openapi.SchemaList) ([]UnionVariant, []*openapi.Sche
 
 		uv := UnionVariant{FieldName: fieldName, Type: tp.String(), Zero: unsetValue(v, tp)}
 		uv.Members, uv.Required, uv.Object = objectShape(v)
+		uv.Pinned = pinnedMembers(v)
 		out = append(out, uv)
 		schemas = append(schemas, v)
 	}
@@ -646,4 +652,34 @@ func unsetValue(v *openapi.Schema, tp *GoType) string {
 	}
 
 	return ""
+}
+
+// pinnedMembers returns the members of the object s that allow one value, by a const or a one-value enum.
+func pinnedMembers(s *openapi.Schema) []PinnedMember {
+	var out []PinnedMember
+
+	for _, p := range orderedProperties(s) {
+		v := deref(p.schema)
+		if v == nil {
+			continue
+		}
+
+		value := v.Const
+		if len(value) == 0 && len(v.Enum) == 1 {
+			value = v.Enum[0]
+		}
+
+		if len(value) == 0 {
+			continue
+		}
+
+		c := slices.Clone(value)
+		if err := c.Compact(); err != nil {
+			continue
+		}
+
+		out = append(out, PinnedMember{Name: p.name, Value: string(c)})
+	}
+
+	return out
 }

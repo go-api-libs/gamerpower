@@ -233,6 +233,10 @@ type Schema struct {
 	MemberDecoder bool `json:"memberDecoder,omitzero"`
 	// Tagged is set for a struct made from a tagged union, whose methods check that only the member the tag names is set.
 	Tagged *Tagged `json:"tagged,omitzero"`
+	// ReadOnly and WriteOnly are the fields, as Go selectors through embedded parts, that a request leaves out and a
+	// response leaves out.
+	ReadOnly  []string `json:"readOnly,omitempty"`
+	WriteOnly []string `json:"writeOnly,omitempty"`
 }
 
 // AllOfUnion is the union part of an allOf.
@@ -276,9 +280,17 @@ type UnionVariant struct {
 	Members  []string `json:"members,omitempty"`
 	Required []string `json:"required,omitempty"`
 	Object   bool     `json:"object,omitzero"`
+	// Pinned are the members the variant allows one value for, by its const or a one-value enum.
+	Pinned []PinnedMember `json:"pinned,omitempty"`
 	// Path is set for a choice that is an alternative of a union nested in this one, however deep: the fields of the
 	// unions on the way to it, outermost first, each set to its union with the next one set.
 	Path []UnionStep `json:"path,omitempty"`
+}
+
+// PinnedMember is a member an alternative allows one value for, written as JSON.
+type PinnedMember struct {
+	Name  string `json:"name,omitzero"`
+	Value string `json:"value,omitzero"`
 }
 
 // UnionStep is a field holding a nested union, on the way to one of its alternatives.
@@ -333,6 +345,10 @@ type Field struct {
 	Description string `json:"description,omitzero"`
 	Required    bool   `json:"required,omitzero"`
 	Embedded    bool   `json:"embedded,omitzero"` // true for allOf $ref entries rendered as embedded structs
+	// ReadOnly and WriteOnly mark a property only responses carry, or only requests: a request leaves the former out,
+	// a response the latter, and neither requires it.
+	ReadOnly  bool `json:"readOnly,omitzero"`
+	WriteOnly bool `json:"writeOnly,omitzero"`
 
 	// IsDateTimeOrInt is true when the property's schema is a oneOf of a
 	// date-time string and an integer. The Go type is time.Time, but a custom
@@ -577,9 +593,24 @@ func (d Document) HasOptionalAuthCalls() bool {
 	return slices.ContainsFunc(d.InteractionCalls, func(ic InteractionCall) bool { return ic.Op.Auth != "" && ic.Op.AuthOptional })
 }
 
+// EncodesItself reports whether the type has a MarshalJSONTo method of its own.
+func (s Schema) EncodesItself() bool {
+	return s.Tagged != nil || s.AllOfUnion != nil || s.Unimplemented != ""
+}
+
+// HasReadOnly reports whether a type has fields a request leaves out.
+func (doc Document) HasReadOnly() bool {
+	return slices.ContainsFunc(doc.Schemas, func(s Schema) bool { return len(s.ReadOnly) > 0 })
+}
+
+// HasWriteOnly reports whether a type has fields a response leaves out.
+func (doc Document) HasWriteOnly() bool {
+	return slices.ContainsFunc(doc.Schemas, func(s Schema) bool { return len(s.WriteOnly) > 0 })
+}
+
 // NeedsJSONHelpers reports whether a generated type decodes its alternatives itself, needing the JSON helpers.
 func (doc Document) NeedsJSONHelpers() bool {
 	return slices.ContainsFunc(doc.Schemas, func(s Schema) bool {
-		return s.Discriminator != "" || s.AllOfUnion != nil && s.Unimplemented == "" || s.MemberDecoder || s.Tagged != nil
+		return s.Kind == SchemaKindUnion || s.AllOfUnion != nil && s.Unimplemented == "" || s.MemberDecoder || s.Tagged != nil
 	})
 }

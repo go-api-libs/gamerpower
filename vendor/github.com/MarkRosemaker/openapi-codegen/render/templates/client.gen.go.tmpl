@@ -349,7 +349,7 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 	}).WithContext(ctx)
 
 {{ if .RequestBody }}
-	go func() { pw.CloseWithError(json.MarshalWrite(pw, body, jsonOpts)) }()
+	go func() { pw.CloseWithError(json.MarshalWrite(pw, body, {{ if $.HasReadOnly }}jsonOptsRequest{{ else }}jsonOpts{{ end }})) }()
 	defer pr.Close()
 {{- end}}
 
