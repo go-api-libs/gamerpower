@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MarkRosemaker/openapi-codegen/ir"
 	"github.com/MarkRosemaker/openapi-enrich/cassette"
@@ -316,9 +317,28 @@ func goLiteralForType(p ir.Param, value string) string {
 		if p.IsUnixTime {
 			return fmt.Sprintf("time.Unix(%s, 0)", value)
 		}
+
+		if t, err := time.Parse(time.RFC3339Nano, value); err == nil {
+			return timeLiteral(t)
+		}
+	case "civil.Date":
+		if d, err := time.Parse(time.DateOnly, value); err == nil {
+			return fmt.Sprintf("civil.Date{Year: %d, Month: %d, Day: %d}", d.Year(), d.Month(), d.Day())
+		}
 	}
 
 	return fmt.Sprintf("%q", value)
+}
+
+// timeLiteral is a Go expression for t that keeps its offset, so it formats back to what was recorded.
+func timeLiteral(t time.Time) string {
+	loc := "time.UTC"
+	if _, offset := t.Zone(); offset != 0 {
+		loc = fmt.Sprintf("time.FixedZone(\"\", %d)", offset)
+	}
+
+	return fmt.Sprintf("time.Date(%d, %d, %d, %d, %d, %d, %d, %s)",
+		t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), loc)
 }
 
 // bodyLiteral returns a Go expression of type goType for the JSON value v (as
