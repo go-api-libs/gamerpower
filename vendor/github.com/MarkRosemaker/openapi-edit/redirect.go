@@ -77,7 +77,7 @@ func redirectSchemas(doc *openapi.Document, to map[string]string, description st
 
 	repointed := map[*openapi.Schema]bool{}
 
-	walkSchemas(doc, func(s *openapi.Schema) {
+	WalkSchemas(doc, func(s *openapi.Schema) {
 		newName, ok := renamedRef(s, to)
 		if !ok {
 			return
@@ -91,7 +91,7 @@ func redirectSchemas(doc *openapi.Document, to map[string]string, description st
 		repointed[s] = true
 	})
 
-	walkSchemas(doc, func(s *openapi.Schema) {
+	WalkSchemas(doc, func(s *openapi.Schema) {
 		s.OneOf = dropDuplicateAlternatives(s.OneOf, repointed)
 		s.AnyOf = dropDuplicateAlternatives(s.AnyOf, repointed)
 	})

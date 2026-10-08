@@ -219,6 +219,19 @@ It repeats until each name that remains is referred to, since removing one can
 leave another without a reference. A component not among the names stays,
 referred to or not, since a specification may define one only to document it.
 
+### Reaching every schema
+
+`WalkSchemas` calls a function once for every schema of a document, wherever it
+is: in a component, a parameter, a body, a header or a callback, and inside
+another schema. It visits them in the order the document holds them, and each
+only once, so the function may change what it is given:
+
+```go
+edit.WalkSchemas(doc, func(s *openapi.Schema) {
+	s.Example = nil
+})
+```
+
 ## Scope
 
 Operations belong here when they satisfy two conditions: they **mutate** a
@@ -236,6 +249,8 @@ node being changed.
   describing them where they are used (`DescribeReferences`)
 - ✅ Removing the components an edit left without a reference
   (`RemoveUnreferenced`)
+- ✅ Reaching every schema of a document, for a change of your own
+  (`WalkSchemas`)
 
 **Out of scope**
 

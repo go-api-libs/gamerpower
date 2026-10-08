@@ -70,7 +70,7 @@ func TrimSchemaExamples(doc *openapi.Document, maxItems int) error {
 		return trimmed
 	}
 
-	walkSchemas(doc, func(s *openapi.Schema) {
+	WalkSchemas(doc, func(s *openapi.Schema) {
 		s.Example = trim(s.Example)
 
 		for i, ex := range s.Examples {

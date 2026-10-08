@@ -20,9 +20,5 @@ func operation(d *openapi.Document, o *openapi.Operation) error {
 		return &errpath.ErrField{Field: "responses", Err: err}
 	}
 
-	// if err := callbacks(o.Callbacks); err != nil {
-	// 	return &errpath.ErrField{Field: "callbacks", Err: err}
-	// }
-
 	return nil
 }

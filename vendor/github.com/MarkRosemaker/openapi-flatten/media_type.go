@@ -8,16 +8,10 @@ import (
 	"github.com/ettle/strcase"
 )
 
-// nameMediaType returns a human-readable name for the media type.
-func nameMediaType(rspOrReqBodyName, nameMediaRange string,
-	// "Response" or "RequestBody"
-	tp string,
-) string {
-	return strcase.ToGoPascal(strings.Join([]string{
-		strings.TrimSuffix(rspOrReqBodyName, tp),
-		// NOTE: We used to add nameMediaRange and tp in this []string
-		// We need to find a way to include it if and only if there is ambiguity
-	}, " "))
+// nameMediaType names the schema of a media type after the response, request body or parameter it is in, without its
+// kind, tp, such as "Response". Two media types of one are told apart by uniqueName.
+func nameMediaType(name, tp string) string {
+	return strcase.ToGoPascal(strings.TrimSuffix(name, tp))
 }
 
 func mediaType(d *openapi.Document, mt *openapi.MediaType, mtName string, alwaysMove bool) error {
@@ -30,14 +24,6 @@ func mediaType(d *openapi.Document, mt *openapi.MediaType, mtName string, always
 			return &errpath.ErrField{Field: "schema", Err: err}
 		}
 	}
-
-	// if err := l.resolveExamples(mt.Examples); err != nil {
-	// 	return &errpath.ErrField{Field: "examples", Err: err}
-	// }
-
-	// if err := l.resolveEncodings(mt.Encoding); err != nil {
-	// 	return &errpath.ErrField{Field: "encoding", Err: err}
-	// }
 
 	return nil
 }

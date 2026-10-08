@@ -11,12 +11,16 @@ import (
 	edit "github.com/MarkRosemaker/openapi-edit"
 )
 
+// methodWords begin a name derived from an operation, as its HTTP method; anywhere else, such as the Post of
+// GetPostByID, they name what the API is about.
+var methodWords = map[string]bool{
+	"Get": true, "Post": true, "Put": true, "Delete": true,
+	"Patch": true, "Head": true, "Options": true, "Trace": true,
+}
+
 // noiseWords are removed when shortening path-derived schema names.
 // They are structural or protocol-level tokens that carry no domain meaning.
 var noiseWords = map[string]bool{
-	// HTTP methods
-	"Get": true, "Post": true, "Put": true, "Delete": true,
-	"Patch": true, "Head": true, "Options": true, "Trace": true,
 	// HTTP/REST wrappers
 	"Ok": true, "Response": true, "Request": true, "Body": true,
 	// Format indicators
@@ -114,7 +118,7 @@ func isVersionSegment(w string) bool {
 }
 
 // shortName computes a shortened version of name that is not already in
-// existing.  It removes noise words, version segments, and digit-only tokens
+// existing.  It removes noise words, an HTTP method it begins with, version segments, and digit-only tokens
 // (e.g. path parameters like CIK numbers), deduplicates consecutive identical
 // words (case-insensitive), then ensures uniqueness.
 // Returns name unchanged if no meaningful shortening is possible.
@@ -122,8 +126,8 @@ func shortName(name string, existing openapi.Schemas) string {
 	words := splitCamelCase(name)
 
 	filtered := make([]string, 0, len(words)*2)
-	for _, w := range words {
-		if noiseWords[w] || isVersionSegment(w) {
+	for i, w := range words {
+		if noiseWords[w] || isVersionSegment(w) || i == 0 && methodWords[w] {
 			continue
 		}
 		// Further split at letter/digit boundaries and drop digit-only tokens.

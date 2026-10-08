@@ -9,9 +9,7 @@ func content(d *openapi.Document, c openapi.Content,
 	rspOrReqBodyName, tp string, alwaysMove bool,
 ) error {
 	for mr, mt := range c.ByIndex() {
-		if err := mediaType(d, mt,
-			nameMediaType(rspOrReqBodyName, nameMediaRange(mr), tp),
-			alwaysMove); err != nil {
+		if err := mediaType(d, mt, nameMediaType(rspOrReqBodyName, tp), alwaysMove); err != nil {
 			return &errpath.ErrKey{Key: string(mr), Err: err}
 		}
 	}

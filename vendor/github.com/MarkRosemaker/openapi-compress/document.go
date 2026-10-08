@@ -116,33 +116,14 @@ func deduplicateSchemasAtThreshold(d *openapi.Document, threshold float64, deriv
 		}
 
 		for j := i + 1; j < len(list); j++ {
-			schemaB := list[j]
-
-			// only two objects with properties can be similar without having the same shape
-			if removed[j] || keys[i] != keys[j] && (threshold >= 1.0 || !hasProperties(schemaA) || !hasProperties(schemaB)) {
+			if removed[j] {
 				continue
 			}
 
-			var sim float64
-			if threshold >= 1.0 {
-				// Fast path: same shape, ignoring documentation-only differences.
-				if schema.SameShape(schemaA, schemaB) {
-					sim = 1.0
-				}
-			} else {
-				// Every property in only one schema scores nothing, so if the shared names alone are too few, skip the
-				// expensive similarity computation.
-				if pa, pb := len(schemaA.Properties), len(schemaB.Properties); pa > 0 && pb > 0 {
-					shared := sharedNames(schemaA.Properties, schemaB.Properties)
-					if float64(shared)/float64(pa+pb-shared) < threshold {
-						continue
-					}
-				}
+			schemaB := list[j]
 
-				sim = schemasSimilarity(schemaA, schemaB)
-			}
-
-			if sim < threshold {
+			sim, ok := similarity(schemaA, schemaB, keys[i] == keys[j], threshold)
+			if !ok {
 				continue
 			}
 
@@ -179,6 +160,33 @@ func deduplicateSchemasAtThreshold(d *openapi.Document, threshold float64, deriv
 	}
 
 	return canonicals, nil
+}
+
+// similarity scores schemas a and b, whose shape keys are equal or not, and reports whether they are similar enough
+// to merge at threshold.
+func similarity(a, b *openapi.Schema, sameKey bool, threshold float64) (float64, bool) {
+	if threshold >= 1.0 {
+		// Fast path: same shape, ignoring documentation-only differences.
+		return 1.0, sameKey && schema.SameShape(a, b)
+	}
+
+	// only two objects with properties can be similar without having the same shape
+	if !sameKey && (!hasProperties(a) || !hasProperties(b)) {
+		return 0, false
+	}
+
+	// Every property in only one schema scores nothing, so if the shared names alone are too few, skip the expensive
+	// similarity computation.
+	if pa, pb := len(a.Properties), len(b.Properties); pa > 0 && pb > 0 {
+		shared := sharedNames(a.Properties, b.Properties)
+		if float64(shared)/float64(pa+pb-shared) < threshold {
+			return 0, false
+		}
+	}
+
+	sim := schemasSimilarity(a, b)
+
+	return sim, sim >= threshold
 }
 
 // deduplicateParameters removes exact duplicate parameter definitions from
@@ -259,6 +267,8 @@ func replaceParameterRefsInDocument(d *openapi.Document, replacements map[string
 			replaceParameterRefsInPathItem(piRef.Value, replacements)
 		}
 	}
+
+	replaceParameterRefsInCallbacks(d.Components.Callbacks, replacements)
 }
 
 func replaceParameterRefsInPathItem(p *openapi.PathItem, replacements map[string]string) {
@@ -271,6 +281,22 @@ func replaceParameterRefsInPathItem(p *openapi.PathItem, replacements map[string
 	for _, op := range p.Operations {
 		if op != nil {
 			replaceParameterRefList(op.Parameters, replacements)
+			replaceParameterRefsInCallbacks(op.Callbacks, replacements)
+		}
+	}
+}
+
+// replaceParameterRefsInCallbacks updates $ref identifiers for parameters in the requests the callbacks describe.
+func replaceParameterRefsInCallbacks(cs openapi.CallbackRefs, replacements map[string]string) {
+	for _, c := range cs {
+		if c == nil || c.Value == nil {
+			continue
+		}
+
+		for _, piRef := range *c.Value {
+			if piRef != nil {
+				replaceParameterRefsInPathItem(piRef.Value, replacements)
+			}
 		}
 	}
 }

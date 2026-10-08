@@ -19,16 +19,9 @@ func nameResponse(opID string, code openapi.StatusCode) string {
 }
 
 func response(d *openapi.Document, r *openapi.Response, rspName string, alwaysMove bool) error {
-	// if err := l.resolveHeaders(r.Headers); err != nil {
-	// 	return &errpath.ErrField{Field: "headers", Err: err}
-	// }
 	if err := content(d, r.Content, rspName, "Response", alwaysMove); err != nil {
 		return &errpath.ErrField{Field: "content", Err: err}
 	}
-
-	// if err := l.resolveLinks(r.Links); err != nil {
-	// 	return &errpath.ErrField{Field: "links", Err: err}
-	// }
 
 	return nil
 }

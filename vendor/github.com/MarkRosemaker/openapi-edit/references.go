@@ -13,7 +13,7 @@ import (
 func CountReferences(doc *openapi.Document) map[string]int {
 	counts := map[string]int{}
 
-	walkSchemas(doc, func(s *openapi.Schema) {
+	WalkSchemas(doc, func(s *openapi.Schema) {
 		if s.Ref == nil {
 			return
 		}
@@ -40,7 +40,7 @@ func DescribeReferences(doc *openapi.Document, descriptions map[string]string) e
 		}
 	}
 
-	walkSchemas(doc, func(s *openapi.Schema) {
+	WalkSchemas(doc, func(s *openapi.Schema) {
 		if s.Ref == nil || s.Description != "" {
 			return
 		}
@@ -65,7 +65,7 @@ func RemoveUnreferenced(doc *openapi.Document, names ...string) []string {
 	for {
 		used := map[string]int{}
 
-		walkSchemas(doc, func(s *openapi.Schema) {
+		WalkSchemas(doc, func(s *openapi.Schema) {
 			if s.Ref != nil {
 				if name, ok := strings.CutPrefix(s.Ref.Identifier, schemaRefPrefix); ok {
 					used[name]++

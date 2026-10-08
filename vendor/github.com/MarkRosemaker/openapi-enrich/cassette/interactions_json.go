@@ -21,24 +21,29 @@ var jsonOpts = json.JoinOptions(
 	json.WithUnmarshalers(json.UnmarshalFromFunc(jsonutil.HTTPHeaderUnmarshal)),
 )
 
+// InteractionsReadFile reads the interactions in the JSON file at path.
 func InteractionsReadFile(path string) (Interactions, error) {
 	return jsonutil.ReadFile[Interactions](path, jsonOpts)
 }
 
+// InteractionsUnmarshal decodes interactions from JSON.
 func InteractionsUnmarshal(data []byte) (Interactions, error) {
 	out := Interactions{}
 	return out, json.Unmarshal(data, &out, jsonOpts)
 }
 
+// InteractionsUnmarshalRead decodes interactions from the JSON r holds.
 func InteractionsUnmarshalRead(r io.Reader) (Interactions, error) {
 	out := Interactions{}
 	return out, json.UnmarshalRead(r, &out, jsonOpts)
 }
 
+// WriteFile writes the interactions as JSON to the file at path.
 func (ias Interactions) WriteFile(path string) error {
 	return jsonutil.WriteFile(path, ias, jsonOpts)
 }
 
+// MarshalWrite writes the interactions as JSON to w.
 func (ias Interactions) MarshalWrite(w io.Writer) error {
 	return json.MarshalWrite(w, ias, jsonOpts)
 }

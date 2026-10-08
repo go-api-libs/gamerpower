@@ -17,14 +17,13 @@ func operationResponses(d *openapi.Document, rs openapi.OperationResponses, opID
 	return nil
 }
 
+// responses flattens the component responses, which are where they belong already. One an operation uses for a
+// failure has its schema named even when it is a scalar, as an operation's own failure has.
 func responses(d *openapi.Document, rs openapi.ResponsesByName) error {
-	for name, r := range rs.ByIndex() {
-		// NOTE: We are *not* calling responseRef here,
-		// because we are calling this function from Components,
-		// where the response should already be.
-		alwaysMove := isFailureResponse(d, name)
+	failures := failureResponses(d)
 
-		if err := response(d, r.Value, name, alwaysMove); err != nil {
+	for name, r := range rs.ByIndex() {
+		if err := response(d, r.Value, name, failures[newRef("responses", name).Identifier]); err != nil {
 			return &errpath.ErrKey{Key: string(name), Err: err}
 		}
 	}
@@ -32,19 +31,19 @@ func responses(d *openapi.Document, rs openapi.ResponsesByName) error {
 	return nil
 }
 
-// isFailureResponse reports whether an operation uses the component response named name for a status other than a success.
-func isFailureResponse(d *openapi.Document, name string) bool {
-	ref := newRef("responses", name).Identifier
+// failureResponses is the set of references to component responses an operation uses for a status other than a success.
+func failureResponses(d *openapi.Document) map[string]bool {
+	refs := map[string]bool{}
 
 	for _, p := range d.Paths {
 		for _, o := range p.Operations {
 			for code, rs := range o.Responses {
-				if !code.IsSuccess() && rs.Ref != nil && rs.Ref.Identifier == ref {
-					return true
+				if !code.IsSuccess() && rs.Ref != nil {
+					refs[rs.Ref.Identifier] = true
 				}
 			}
 		}
 	}
 
-	return false
+	return refs
 }

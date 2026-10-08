@@ -40,7 +40,7 @@ func ExtractSchema(doc *openapi.Document, name string, match func(*openapi.Schem
 
 	var matches []*openapi.Schema
 
-	walkSchemas(doc, func(s *openapi.Schema) {
+	WalkSchemas(doc, func(s *openapi.Schema) {
 		if s.Ref == nil && !named[s] && match(s) {
 			matches = append(matches, s)
 		}

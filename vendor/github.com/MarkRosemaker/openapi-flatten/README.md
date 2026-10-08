@@ -249,6 +249,7 @@ collapses them again — the two are designed to be used in that order.
 ## Additional Information
 
 - [**Go Reference**](https://pkg.go.dev/github.com/MarkRosemaker/openapi-flatten): API documentation.
+- [**Roadmap**](docs/roadmap.md): what is planned and not yet done.
 
 ## Contributing
 

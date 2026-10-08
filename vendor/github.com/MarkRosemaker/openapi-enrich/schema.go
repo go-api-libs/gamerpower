@@ -13,6 +13,7 @@ import (
 	"uuid"
 
 	"github.com/MarkRosemaker/openapi"
+	edit "github.com/MarkRosemaker/openapi-edit"
 	"github.com/MarkRosemaker/openapi-enrich/cassette"
 	merge "github.com/MarkRosemaker/openapi-merge"
 	apitypes "github.com/go-api-libs/types"
@@ -240,7 +241,7 @@ func distinctSchemas(l []*openapi.Schema) []*openapi.Schema {
 // collapseSamples replaces every union of samples left in doc, those nothing in the specification routed, by the one
 // schema its samples merge into, or by a plain union of them if they cannot.
 func collapseSamples(doc *openapi.Document) {
-	walkSchemas(doc, func(s *openapi.Schema) {
+	edit.WalkSchemas(doc, func(s *openapi.Schema) {
 		if !merge.IsSamples(s) {
 			return
 		}

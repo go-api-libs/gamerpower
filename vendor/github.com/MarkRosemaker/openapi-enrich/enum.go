@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json/jsontext"
 	json "encoding/json/v2"
+	"maps"
+	"slices"
 
 	"github.com/MarkRosemaker/errpath"
 	"github.com/MarkRosemaker/openapi"
@@ -46,43 +48,9 @@ func growEnumsValue(s *openapi.Schema, v any) error {
 
 	switch s.Type {
 	case openapi.TypeObject:
-		obj, ok := v.(map[string]any)
-		if !ok {
-			return nil
+		if obj, ok := v.(map[string]any); ok {
+			return growEnumsObject(s, obj)
 		}
-
-		for key, propRef := range s.Properties.ByIndex() {
-			val, ok := obj[key]
-			if !ok {
-				continue
-			}
-
-			if err := growEnumsValue(deref(propRef), val); err != nil {
-				return &errpath.ErrField{Field: "properties", Err: &errpath.ErrKey{Key: key, Err: err}}
-			}
-		}
-
-		if ap := s.AdditionalProperties; ap != nil && ap.Schema != nil {
-			for key, val := range obj {
-				if cassette.RedactsBodyKey(key) {
-					continue
-				}
-
-				if err := growEnumsValue(deref(ap.Schema), val); err != nil {
-					return &errpath.ErrField{Field: "additionalProperties", Err: &errpath.ErrKey{Key: key, Err: err}}
-				}
-			}
-		}
-
-		// masking hides a value, never its key, so every key observed is a real one
-		if s.PropertyNames != nil {
-			for key := range obj {
-				if err := growEnumsValue(deref(s.PropertyNames), key); err != nil {
-					return &errpath.ErrField{Field: "propertyNames", Err: &errpath.ErrKey{Key: key, Err: err}}
-				}
-			}
-		}
-
 	case openapi.TypeArray:
 		arr, ok := v.([]any)
 		if !ok || s.Items == nil {
@@ -94,13 +62,50 @@ func growEnumsValue(s *openapi.Schema, v any) error {
 				return &errpath.ErrIndex{Index: i, Err: err}
 			}
 		}
-
 	default:
-		if len(s.Enum) == 0 {
-			return nil
+		if len(s.Enum) > 0 {
+			return addEnumValue(s, v)
+		}
+	}
+
+	return nil
+}
+
+// growEnumsObject grows the enums of an object's properties, of the values of a map and of its keys.
+func growEnumsObject(s *openapi.Schema, obj map[string]any) error {
+	for key, propRef := range s.Properties.ByIndex() {
+		val, ok := obj[key]
+		if !ok {
+			continue
 		}
 
-		return addEnumValue(s, v)
+		if err := growEnumsValue(deref(propRef), val); err != nil {
+			return &errpath.ErrField{Field: "properties", Err: &errpath.ErrKey{Key: key, Err: err}}
+		}
+	}
+
+	// a map does not keep the order the keys were recorded in, so new values are added in the keys' order
+	keys := slices.Sorted(maps.Keys(obj))
+
+	if ap := s.AdditionalProperties; ap != nil && ap.Schema != nil {
+		for _, key := range keys {
+			if cassette.RedactsBodyKey(key) {
+				continue
+			}
+
+			if err := growEnumsValue(deref(ap.Schema), obj[key]); err != nil {
+				return &errpath.ErrField{Field: "additionalProperties", Err: &errpath.ErrKey{Key: key, Err: err}}
+			}
+		}
+	}
+
+	// masking hides a value, never its key, so every key observed is a real one
+	if s.PropertyNames != nil {
+		for _, key := range keys {
+			if err := growEnumsValue(deref(s.PropertyNames), key); err != nil {
+				return &errpath.ErrField{Field: "propertyNames", Err: &errpath.ErrKey{Key: key, Err: err}}
+			}
+		}
 	}
 
 	return nil

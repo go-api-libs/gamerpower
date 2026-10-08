@@ -121,7 +121,7 @@ func RenameSchemas(doc *openapi.Document, to map[string]string) error {
 	// while Set would move it to the end of the section.
 	maps.Copy(schemas, moved)
 
-	walkSchemas(doc, func(s *openapi.Schema) {
+	WalkSchemas(doc, func(s *openapi.Schema) {
 		if newName, ok := renamedRef(s, to); ok {
 			s.Ref.Identifier = schemaRefPrefix + newName
 		}
@@ -164,7 +164,7 @@ func renamedRef(s *openapi.Schema, to map[string]string) (string, bool) {
 // rewriteMappings points every discriminator mapping value that stands for a key of to at that key's value, keeping
 // the value's form: a name or a reference.
 func rewriteMappings(doc *openapi.Document, to map[string]string) {
-	walkSchemas(doc, func(s *openapi.Schema) {
+	WalkSchemas(doc, func(s *openapi.Schema) {
 		if s.Discriminator == nil {
 			return
 		}
@@ -213,7 +213,7 @@ func implicitMappings(doc *openapi.Document, to map[string]string) (add func()) 
 
 	implicit := map[*openapi.Discriminator][]string{}
 
-	walkSchemas(doc, func(s *openapi.Schema) {
+	WalkSchemas(doc, func(s *openapi.Schema) {
 		d := s.Discriminator
 		if d == nil {
 			return

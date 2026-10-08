@@ -2,7 +2,7 @@ package edit
 
 import "github.com/MarkRosemaker/openapi"
 
-// walkSchemas calls fn once for every schema reachable from doc: through
+// WalkSchemas calls fn once for every schema reachable from doc: through
 // components (schemas, responses, parameters, request bodies, headers,
 // callbacks, path items), through every path, operation, and webhook, and
 // through the schemas each one contains or refers to.
@@ -15,11 +15,9 @@ import "github.com/MarkRosemaker/openapi"
 // freely edit what it is given without risking infinite recursion on a
 // self-referential schema.
 //
-// This is the traversal RenameSchema uses to find every occurrence of a
-// reference; it's shared because other structural edits need the same
-// walk with a different fn, e.g. finding every reference to a schema that's
-// about to be redirected onto another with [RedirectSchema].
-func walkSchemas(doc *openapi.Document, fn func(*openapi.Schema)) {
+// It is the traversal every edit here makes, and is exported for any other
+// change that has to reach every schema of a document.
+func WalkSchemas(doc *openapi.Document, fn func(*openapi.Schema)) {
 	w := &schemaWalker{fn: fn, visited: map[*openapi.Schema]bool{}}
 
 	for _, s := range doc.Components.Schemas.ByIndex() {

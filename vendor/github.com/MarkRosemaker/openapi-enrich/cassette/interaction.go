@@ -116,8 +116,10 @@ func NewResponse(resp *http.Response) (Response, error) {
 	return r, nil
 }
 
+// Body is a recorded body: written as the JSON it is, or as a string if it is no JSON.
 type Body []byte
 
+// MarshalJSONTo implements [json.MarshalerTo].
 func (b Body) MarshalJSONTo(enc *jsontext.Encoder) error {
 	if jsontext.Value(b).IsValid() {
 		return enc.WriteValue(jsontext.Value(b))
@@ -126,6 +128,7 @@ func (b Body) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return enc.WriteToken(jsontext.String(string(b)))
 }
 
+// UnmarshalJSONFrom implements [json.UnmarshalerFrom].
 func (b *Body) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	val, err := dec.ReadValue()
 	if err != nil {

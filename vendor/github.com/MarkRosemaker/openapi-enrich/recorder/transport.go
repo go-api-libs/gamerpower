@@ -44,6 +44,8 @@ type Transport struct {
 	cache map[string]cassette.Response // keyed by requestKey
 }
 
+// NewTransport returns a transport that sends requests through transport, the default one if nil, and answers those
+// interactions already holds a response to from them instead.
 func NewTransport(transport http.RoundTripper, interactions cassette.Interactions) *Transport {
 	cache := map[string]cassette.Response{}
 
