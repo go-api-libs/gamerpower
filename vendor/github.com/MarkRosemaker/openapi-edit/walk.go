@@ -1,11 +1,6 @@
 package edit
 
-import (
-	"maps"
-	"slices"
-
-	"github.com/MarkRosemaker/openapi"
-)
+import "github.com/MarkRosemaker/openapi"
 
 // walkSchemas calls fn once for every schema reachable from doc: through
 // components (schemas, responses, parameters, request bodies, headers,
@@ -99,22 +94,17 @@ func (w *schemaWalker) operation(op *openapi.Operation) {
 		w.response(r)
 	}
 
-	// an operation's callbacks keep no order of their own
-	for _, name := range slices.Sorted(maps.Keys(op.Callbacks)) {
-		w.callback(op.Callbacks[name])
+	for _, c := range op.Callbacks.ByIndex() {
+		w.callbackRef(c)
 	}
 }
 
-// callbackRef covers components.callbacks, which holds references, whereas an
-// operation holds callbacks by value.
 func (w *schemaWalker) callbackRef(r *openapi.CallbackRef) {
-	if r != nil && r.Value != nil {
-		w.callback(*r.Value)
+	if r == nil || r.Value == nil {
+		return
 	}
-}
 
-func (w *schemaWalker) callback(c openapi.Callback) {
-	for _, p := range c.ByIndex() {
+	for _, p := range r.Value.ByIndex() {
 		w.pathItemRef(p)
 	}
 }
@@ -175,12 +165,6 @@ func (w *schemaWalker) content(c openapi.Content) {
 				w.headers(e.Headers)
 			}
 		}
-	}
-}
-
-func (w *schemaWalker) schemaList(l openapi.SchemaList) {
-	for _, s := range l {
-		w.schema(s)
 	}
 }
 

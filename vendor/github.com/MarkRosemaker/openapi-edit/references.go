@@ -63,9 +63,15 @@ func RemoveUnreferenced(doc *openapi.Document, names ...string) []string {
 	var removed []string
 
 	for {
-		used := CountReferences(doc)
+		used := map[string]int{}
 
 		walkSchemas(doc, func(s *openapi.Schema) {
+			if s.Ref != nil {
+				if name, ok := strings.CutPrefix(s.Ref.Identifier, schemaRefPrefix); ok {
+					used[name]++
+				}
+			}
+
 			if s.Discriminator == nil {
 				return
 			}

@@ -5,6 +5,7 @@ import (
 	"github.com/MarkRosemaker/openapi"
 )
 
+// MediaType merges b into a: their schemas, and b's example where a has none.
 func MediaType(a, b *openapi.MediaType) error {
 	if b.Schema != nil {
 		if a.Schema != nil {
@@ -16,18 +17,9 @@ func MediaType(a, b *openapi.MediaType) error {
 		}
 	}
 
-	// set the example of b
 	if a.Example == nil {
 		a.Example = b.Example
 	}
-
-	// if err := mt.Examples.Validate(); err != nil {
-	// 	return &errpath.ErrField{Field: "examples", Err: err}
-	// }
-
-	// if err := mt.Encoding.Validate(); err != nil {
-	// 	return &errpath.ErrField{Field: "encoding", Err: err}
-	// }
 
 	return extensions(a.Extensions, b.Extensions)
 }

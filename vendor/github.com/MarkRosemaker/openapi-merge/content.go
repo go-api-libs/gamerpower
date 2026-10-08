@@ -5,6 +5,7 @@ import (
 	"github.com/MarkRosemaker/openapi"
 )
 
+// Content merges b into a: a media type only in b is added, one in both is merged.
 func Content(a *openapi.Content, b openapi.Content) error {
 	for mr, mtB := range b.ByIndex() {
 		mtA, ok := (*a)[mr]
