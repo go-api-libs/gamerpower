@@ -134,9 +134,19 @@ How the specification maps onto Go:
   `const` or the only value of its `enum`, is sent by the client itself: in the
   path, the query or the headers, such as Notion's `Notion-Version`. The caller
   never passes it. An `example` alone does not fix a value.
-- **Query parameters** — an array is sent as one value per element (form style,
-  exploded). "X or an array of X" is sent as the array, a union of strings as a
-  string, and `null` is dropped, since a query string cannot carry it.
+- **Query parameters** — every style OpenAPI defines, written by the client,
+  read by the server and api.js alike. An array or an object of single values
+  (a struct of its properties, or a map) is sent as one value joined by commas
+  (`form`, not exploded), spaces (`spaceDelimited`) or pipes (`pipeDelimited`),
+  an object as its names and values in turn; exploded, an array as one value
+  per element, an object as one parameter per member, under the member's name,
+  or with `deepObject` as `name[member]`. An exploded map holds every parameter
+  no other does. `allowReserved` leaves reserved characters as they are, but for
+  `&`, `#` and `+`, which would change how the query reads. A delimiter within a
+  value is escaped, so every value arrives as it was sent. "X or an array of X"
+  is sent as the array, any other union as a string, and `null` is dropped,
+  since a query string cannot carry it. A duration is sent in whole seconds and
+  an integer date-time as a Unix time, as in a body.
 - **Authentication** — each operation sends the credential its own `security`
   names, else the document's: a bearer token or basic auth, read from the
   environment. Where a document uses both, `NewClient` requires at least one, and

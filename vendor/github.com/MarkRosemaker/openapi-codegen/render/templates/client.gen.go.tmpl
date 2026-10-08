@@ -9,10 +9,13 @@ import (
 	"context"
 	"encoding/json/v2"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/civil"
@@ -281,22 +284,7 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 	{{ if not .ParamsInStruct.Required -}}
 	if params != nil {
 	{{- end }}
-		q := make(url.Values, {{ len .QueryParams }})
-{{- range .QueryParams }}
-	{{ if .Item }}
-		for _, v := range {{ .VarName }} {
-			q.Add({{printf "%q" .JSONName}}, {{ .Item.FormatExpr }})
-		}
-	{{ else if .Required }}
-		q[{{printf "%q" .JSONName}}] = []string{ {{- .FormatExpr -}} }
-	{{ else }}
-		if {{ .NotZero }} {
-			q[{{printf "%q" .JSONName}}]  = []string{ {{- .FormatExpr -}} }
-		}
-	{{- end }}
-{{- end }}
-
-		u.RawQuery = q.Encode()
+		{{ .EncodeQuery }}
 	{{ if not .ParamsInStruct.Required -}}
 	}
 	{{- end }}
@@ -480,3 +468,63 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 	}
 }
 {{end}}
+{{- if .EscapesQuery }}
+
+// encodeQuery encodes q as [url.Values.Encode] does, sorted by key, along with escaped, whose values are escaped
+// already.
+func encodeQuery(q, escaped url.Values) string {
+	keys := slices.Concat(slices.Collect(maps.Keys(q)), slices.Collect(maps.Keys(escaped)))
+	slices.Sort(keys)
+
+	var b strings.Builder
+	for _, k := range slices.Compact(keys) {
+		for _, v := range q[k] {
+			if b.Len() > 0 {
+				b.WriteByte('&')
+			}
+
+			b.WriteString(url.QueryEscape(k) + "=" + url.QueryEscape(v))
+		}
+
+		for _, v := range escaped[k] {
+			if b.Len() > 0 {
+				b.WriteByte('&')
+			}
+
+			b.WriteString(url.QueryEscape(k) + "=" + v)
+		}
+	}
+
+	return b.String()
+}
+
+// joinQuery escapes each of parts and joins them by sep, which it leaves as it is, but escapes within a part.
+func joinQuery(parts []string, sep string, escape func(string) string) string {
+	for i, p := range parts {
+		parts[i] = strings.ReplaceAll(escape(p), sep, url.QueryEscape(sep))
+	}
+
+	return strings.Join(parts, sep)
+}
+{{- end }}
+{{- if .AllowsReserved }}
+
+// escapeReserved escapes s as [url.QueryEscape] does, but for the characters RFC 3986 reserves, which allowReserved
+// leaves as they are: all but &, # and +, which would end the parameter, the query or stand for a space.
+func escapeReserved(s string) string {
+	var b strings.Builder
+	for i := range len(s) {
+		switch c := s[i]; {
+		case 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9' ||
+			strings.IndexByte("-._~:/?[]@!$'()*,;=", c) >= 0:
+			b.WriteByte(c)
+		case c == ' ':
+			b.WriteByte('+')
+		default:
+			fmt.Fprintf(&b, "%%%02X", c)
+		}
+	}
+
+	return b.String()
+}
+{{- end }}

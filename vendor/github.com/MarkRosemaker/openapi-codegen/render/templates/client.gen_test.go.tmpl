@@ -300,7 +300,7 @@ func TestClient_Interactions(t *testing.T) {
 		{{range .QueryArgs}}{{.FieldName}}: {{.Literal}},
 		{{ end -}}
 		{{range .HeaderArgs}}{{.FieldName}}: {{.Literal}},
-		{{end}}}{{else if .Op.QueryParams}}, nil{{end}}{{if .Op.RequestBody}}, {{.BodyLiteral}}{{end}});
+		{{end}}}{{end}}{{if .Op.RequestBody}}, {{.BodyLiteral}}{{end}});
 	{{- if .IsSuccess}} err != nil {
 		t.Fatalf("{{.Op.Name}}: %v", err)
 	}
@@ -312,9 +312,11 @@ func TestClient_Interactions(t *testing.T) {
 	{{- end}}
 	{{- end}}
 	{{else}}
-	if err := c.{{.Op.Name}}({{ if and .Op.Auth .Op.AuthOptional }}optionalAuth(ctx){{ else }}ctx{{ end }}{{range .PathArgs}}, {{.}}{{end}}{{if .QueryArgs}}, &{{.Op.ParamStructName}}{
+	if err := c.{{.Op.Name}}({{ if and .Op.Auth .Op.AuthOptional }}optionalAuth(ctx){{ else }}ctx{{ end }}{{range .PathArgs}}, {{.}}{{end}}{{if .Op.ParamsInStruct}}, {{ if not .Op.ParamsInStruct.Required }}&{{ end }}{{.Op.ParamStructName}}{
 		{{range .QueryArgs}}{{.FieldName}}: {{.Literal}},
-		{{end}}}{{else if .Op.QueryParams}}, nil{{end}}{{if .Op.RequestBody}}, {{.BodyLiteral}}{{end}});
+		{{ end -}}
+		{{range .HeaderArgs}}{{.FieldName}}: {{.Literal}},
+		{{end}}}{{end}}{{if .Op.RequestBody}}, {{.BodyLiteral}}{{end}});
 	{{- if .IsSuccess}} err != nil {
 		t.Fatalf("{{.Op.Name}}: %v", err)
 	}

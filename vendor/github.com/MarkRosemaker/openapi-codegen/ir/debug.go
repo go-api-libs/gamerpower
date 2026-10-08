@@ -8,103 +8,106 @@ import "github.com/MarkRosemaker/openapi"
 //
 // A union's alternatives are left as they are: what is open there is the union, not the specification.
 func narrowUnspecified(doc *openapi.Document) {
-	seen := map[*openapi.Schema]bool{}
-
-	var walk func(s *openapi.Schema)
-
-	// value narrows s and walks into it, for a schema that stands for a value of its own
-	value := func(s *openapi.Schema) {
-		if s == nil {
-			return
-		}
-
-		switch {
-		case s.Ref != nil:
-		case isOpen(s) || isOpenBut(s):
-			s.Type = openapi.TypeObject
-		case s.Type == openapi.TypeArray && s.Items == nil:
-			s.Items = &openapi.Schema{Type: openapi.TypeObject}
-		case len(s.Properties) == 0 && s.AdditionalProperties != nil &&
-			(s.AdditionalProperties.Schema == nil && s.AdditionalProperties.Allowed || isOpen(s.AdditionalProperties.Schema)):
-			s.AdditionalProperties = nil
-		}
-
-		walk(s)
-	}
-
-	walk = func(s *openapi.Schema) {
-		if s == nil || seen[s] {
-			return
-		}
-
-		seen[s] = true
-
-		if s.Ref != nil {
-			walk(s.Ref.Value)
-			return
-		}
-
-		for _, p := range s.Properties {
-			value(p)
-		}
-
-		value(s.Items)
-
-		for _, p := range s.PrefixItems {
-			value(p)
-		}
-
-		if s.AdditionalProperties != nil {
-			value(s.AdditionalProperties.Schema)
-		}
-
-		// X in "X or null" stands for the value
-		if v := nullableVariant(s); v != nil {
-			value(v)
-		}
-
-		for _, l := range []openapi.SchemaList{s.AllOf, s.OneOf, s.AnyOf} {
-			for _, e := range l {
-				walk(e)
-			}
-		}
-	}
-
-	content := func(c openapi.Content) {
-		for _, mt := range c {
-			if mt != nil {
-				value(mt.Schema)
-			}
-		}
-	}
+	n := narrower{}
 
 	for _, s := range doc.Components.Schemas {
-		value(s)
+		n.value(s)
 	}
 
 	for _, r := range doc.Components.Responses {
 		if r != nil && r.Value != nil {
-			content(r.Value.Content)
+			n.content(r.Value.Content)
 		}
 	}
 
 	for _, rb := range doc.Components.RequestBodies {
 		if rb != nil && rb.Value != nil {
-			content(rb.Value.Content)
+			n.content(rb.Value.Content)
 		}
 	}
 
 	for _, p := range doc.Paths {
 		for _, op := range p.Operations {
 			if op.RequestBody != nil && op.RequestBody.Value != nil {
-				content(op.RequestBody.Value.Content)
+				n.content(op.RequestBody.Value.Content)
 			}
 
 			for _, r := range op.Responses {
 				if r != nil && r.Value != nil {
-					content(r.Value.Content)
+					n.content(r.Value.Content)
 				}
 			}
+		}
+	}
+}
+
+// narrower walks the schemas of a document for narrowUnspecified, each once.
+type narrower map[*openapi.Schema]bool
+
+// content narrows the schema of each media type in c.
+func (n narrower) content(c openapi.Content) {
+	for _, mt := range c {
+		if mt != nil {
+			n.value(mt.Schema)
+		}
+	}
+}
+
+// value narrows s and walks into it, for a schema that stands for a value of its own.
+func (n narrower) value(s *openapi.Schema) {
+	if s == nil {
+		return
+	}
+
+	switch {
+	case s.Ref != nil:
+	case isOpen(s) || isOpenBut(s):
+		s.Type = openapi.TypeObject
+	case s.Type == openapi.TypeArray && s.Items == nil:
+		s.Items = &openapi.Schema{Type: openapi.TypeObject}
+	case len(s.Properties) == 0 && s.AdditionalProperties != nil &&
+		(s.AdditionalProperties.Schema == nil && s.AdditionalProperties.Allowed || isOpen(s.AdditionalProperties.Schema)):
+		s.AdditionalProperties = nil
+	}
+
+	n.walk(s)
+}
+
+// walk narrows the values s holds, and walks into the schemas it is made of.
+func (n narrower) walk(s *openapi.Schema) {
+	if s == nil || n[s] {
+		return
+	}
+
+	n[s] = true
+
+	if s.Ref != nil {
+		n.walk(s.Ref.Value)
+		return
+	}
+
+	for _, p := range s.Properties {
+		n.value(p)
+	}
+
+	n.value(s.Items)
+
+	for _, p := range s.PrefixItems {
+		n.value(p)
+	}
+
+	if s.AdditionalProperties != nil {
+		n.value(s.AdditionalProperties.Schema)
+	}
+
+	// X in "X or null" stands for the value
+	if v := nullableVariant(s); v != nil {
+		n.value(v)
+	}
+
+	for _, l := range []openapi.SchemaList{s.AllOf, s.OneOf, s.AnyOf} {
+		for _, e := range l {
+			n.walk(e)
 		}
 	}
 }

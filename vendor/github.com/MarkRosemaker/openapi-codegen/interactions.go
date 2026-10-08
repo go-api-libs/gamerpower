@@ -1,8 +1,11 @@
 package codegen
 
 import (
+	"cmp"
 	"encoding/json/v2"
 	"fmt"
+	"maps"
+	"net/http"
 	"net/url"
 	"slices"
 	"strconv"
@@ -25,100 +28,271 @@ func matchInteractions(doc *ir.Document, interactions cassette.Interactions) err
 			continue // just a scaffold
 		}
 
-		u, err := url.Parse(ia.Request.URL)
+		call, err := interactionCall(doc, ia)
 		if err != nil {
 			return err
-		}
-
-		// Strip the base URL path prefix to get the operation-relative path.
-		relPath := strings.TrimPrefix(u.Path, doc.BaseURL.Path)
-		if relPath == "" {
-			relPath = "/"
-		} else if !strings.HasPrefix(relPath, "/") {
-			relPath = "/" + relPath
-		}
-
-		op, pathVals := pickOperation(doc.Operations, ia.Request.Method, relPath)
-		if op == nil {
-			return fmt.Errorf("interaction %s %s: no matching operation found", ia.Request.Method, ia.Request.URL)
-		}
-
-		call := ir.InteractionCall{Op: op}
-
-		for _, pp := range op.PathParams {
-			call.PathArgs = append(call.PathArgs, goLiteralForType(pp, pathVals[pp.JSONName]))
-		}
-
-		q := u.Query()
-		for _, qp := range op.QueryParams {
-			if qp.Item != nil {
-				if vals := q[qp.JSONName]; len(vals) > 0 {
-					call.QueryArgs = append(call.QueryArgs, ir.InteractionParam{
-						FieldName: qp.FieldName,
-						Literal:   sliceLiteral(qp, vals),
-					})
-				}
-
-				continue
-			}
-
-			val := q.Get(qp.JSONName)
-			if val != "" {
-				call.QueryArgs = append(call.QueryArgs, ir.InteractionParam{
-					FieldName: qp.FieldName,
-					Literal:   goLiteralForType(qp, val),
-				})
-			}
-		}
-
-		for _, hp := range op.HeaderParams {
-			val := ia.Request.Headers.Get(hp.JSONName)
-			if val != "" {
-				call.HeaderArgs = append(call.HeaderArgs, ir.InteractionParam{
-					FieldName: hp.FieldName,
-					Literal:   goLiteralForType(hp, val),
-				})
-			}
-		}
-
-		if op.RequestBody != nil {
-			goType := op.RequestBody.TypeName
-			if !op.RequestBody.Required {
-				goType = "*" + goType
-			}
-
-			var raw any
-			if len(ia.Request.Body) > 0 {
-				if err := json.Unmarshal(ia.Request.Body, &raw); err != nil {
-					return fmt.Errorf("decoding request body for %s: %w", op.Name, err)
-				}
-			}
-
-			call.BodyLiteral = bodyLiteral(doc, goType, raw)
-		}
-
-		if r := findResponse(op, ia.Response.StatusCode); r != nil {
-			call.IsSuccess = r.IsSuccess
-			switch {
-			case r.IsSuccess:
-			case r.IsRawBytes:
-				// Nothing was decoded, so there is no generated type to match
-				// on: the client hands the body back as an api.ErrorBody.
-				call.ErrorType = "api.ErrorBody"
-			case r.GoType != nil:
-				call.ErrorType = r.GoType.String()
-			}
-		} else {
-			// No declared response for this exact status code: fall back to the
-			// HTTP convention so the generated assertion at least checks err==nil
-			// vs err!=nil correctly, without asserting a specific error type.
-			call.IsSuccess = ia.Response.StatusCode >= 200 && ia.Response.StatusCode < 300
 		}
 
 		doc.InteractionCalls = append(doc.InteractionCalls, call)
 	}
 
 	return nil
+}
+
+// interactionCall is the call of the operation ia was made to, with the arguments it was made with.
+func interactionCall(doc *ir.Document, ia cassette.Interaction) (ir.InteractionCall, error) {
+	u, err := url.Parse(ia.Request.URL)
+	if err != nil {
+		return ir.InteractionCall{}, err
+	}
+
+	op, pathVals := pickOperation(doc.Operations, ia.Request.Method, relativePath(u.Path, doc.BaseURL.Path))
+	if op == nil {
+		return ir.InteractionCall{}, fmt.Errorf("interaction %s %s: no matching operation found", ia.Request.Method, ia.Request.URL)
+	}
+
+	call := ir.InteractionCall{
+		Op:         op,
+		QueryArgs:  queryArgs(op, u),
+		HeaderArgs: headerArgs(op.HeaderParams, ia.Request.Headers),
+	}
+
+	for _, pp := range op.PathParams {
+		call.PathArgs = append(call.PathArgs, goLiteralForType(pp, pathVals[pp.JSONName]))
+	}
+
+	if op.RequestBody != nil {
+		goType := op.RequestBody.TypeName
+		if !op.RequestBody.Required {
+			goType = "*" + goType
+		}
+
+		var raw any
+		if len(ia.Request.Body) > 0 {
+			if err := json.Unmarshal(ia.Request.Body, &raw); err != nil {
+				return ir.InteractionCall{}, fmt.Errorf("decoding request body for %s: %w", op.Name, err)
+			}
+		}
+
+		call.BodyLiteral = bodyLiteral(doc, goType, raw)
+	}
+
+	setOutcome(&call, op, ia.Response.StatusCode)
+
+	return call, nil
+}
+
+// relativePath is path without the base URL's path, which is where the operations' paths start.
+func relativePath(path, base string) string {
+	rel := strings.TrimPrefix(path, base)
+	if !strings.HasPrefix(rel, "/") {
+		rel = "/" + rel
+	}
+
+	return rel
+}
+
+// queryArgs are the literals of the query parameters of op the query of u holds a value for.
+func queryArgs(op *ir.Operation, u *url.URL) []ir.InteractionParam {
+	q := u.Query()
+
+	var args []ir.InteractionParam
+
+	for _, qp := range op.QueryParams {
+		if lit := queryLiteral(op, qp, u.RawQuery, q); lit != "" {
+			args = append(args, ir.InteractionParam{FieldName: qp.FieldName, Literal: lit})
+		}
+	}
+
+	return args
+}
+
+// queryLiteral is the literal of the query parameter p as written into the query string raw, decoded as q, or empty
+// if it is not there.
+func queryLiteral(op *ir.Operation, p ir.Param, raw string, q url.Values) string {
+	switch {
+	case p.MapValue != nil:
+		return mapLiteral(p, mapEntries(op, p, raw, q))
+	case p.Props != nil:
+		return objectLiteral(p, objectEntries(p, raw, q))
+	case p.Item != nil:
+		values := q[p.JSONName]
+		if p.Delimiter != "" {
+			values = queryParts(raw, p.JSONName, p.Delimiter)
+		}
+
+		if len(values) == 0 {
+			return ""
+		}
+
+		return sliceLiteral(p, values)
+	case q.Get(p.JSONName) != "":
+		return goLiteralForType(p, q.Get(p.JSONName))
+	default:
+		return ""
+	}
+}
+
+// objectEntries are the values of the members of the object parameter p, by name, as written into raw, decoded as q.
+func objectEntries(p ir.Param, raw string, q url.Values) map[string]string {
+	if p.Delimiter != "" {
+		return pairs(queryParts(raw, p.JSONName, p.Delimiter))
+	}
+
+	entries := map[string]string{}
+
+	for _, m := range p.Props {
+		key := m.JSONName
+		if p.DeepObject {
+			key = p.JSONName + "[" + key + "]"
+		}
+
+		if v := q.Get(key); v != "" {
+			entries[m.JSONName] = v
+		}
+	}
+
+	return entries
+}
+
+// mapEntries are the entries of the map parameter p of op, as written into raw, decoded as q.
+func mapEntries(op *ir.Operation, p ir.Param, raw string, q url.Values) map[string]string {
+	if p.Delimiter != "" {
+		return pairs(queryParts(raw, p.JSONName, p.Delimiter))
+	}
+
+	names, prefixes := op.OtherQueryNames(p)
+	entries := map[string]string{}
+
+	for k, vs := range q {
+		switch {
+		case p.DeepObject:
+			name, ok := strings.CutPrefix(k, p.JSONName+"[")
+			if name, found := strings.CutSuffix(name, "]"); ok && found {
+				entries[name] = vs[0]
+			}
+		case !slices.Contains(names, k) &&
+			!slices.ContainsFunc(prefixes, func(prefix string) bool { return strings.HasPrefix(k, prefix) }):
+			entries[k] = vs[0]
+		}
+	}
+
+	return entries
+}
+
+// pairs reads names and values in turn.
+func pairs(parts []string) map[string]string {
+	entries := make(map[string]string, len(parts)/2)
+	for i := 0; i+1 < len(parts); i += 2 {
+		entries[parts[i]] = parts[i+1]
+	}
+
+	return entries
+}
+
+func objectLiteral(p ir.Param, entries map[string]string) string {
+	var fields []string
+
+	for _, m := range p.Props {
+		v, ok := entries[m.JSONName]
+		if !ok {
+			continue
+		}
+
+		lit := goLiteralForType(m, v)
+		if m.Pointer {
+			lit = newLiteral(m, v, lit)
+		}
+
+		fields = append(fields, m.FieldName+": "+lit)
+	}
+
+	if len(fields) == 0 {
+		return ""
+	}
+
+	return p.Type + "{" + strings.Join(fields, ", ") + "}"
+}
+
+// newLiteral is a pointer to lit, the literal of the value v of m: of m's type, where lit is an untyped constant.
+func newLiteral(m ir.Param, v, lit string) string {
+	if lit == v || strings.HasPrefix(lit, `"`) {
+		return fmt.Sprintf("new(%s(%s))", m.Type, lit)
+	}
+
+	return fmt.Sprintf("new(%s)", lit)
+}
+
+func mapLiteral(p ir.Param, entries map[string]string) string {
+	if len(entries) == 0 {
+		return ""
+	}
+
+	elems := make([]string, 0, len(entries))
+	for _, k := range slices.Sorted(maps.Keys(entries)) {
+		elems = append(elems, fmt.Sprintf("%q: %s", k, goLiteralForType(*p.MapValue, entries[k])))
+	}
+
+	return p.Type + "{" + strings.Join(elems, ", ") + "}"
+}
+
+// queryParts returns the parts of the value of the query parameter name in the query string raw, split at sep before
+// each is unescaped, as the generated server's queryParts does.
+func queryParts(raw, name, sep string) []string {
+	for pair := range strings.SplitSeq(raw, "&") {
+		k, v, _ := strings.Cut(pair, "=")
+		if k, err := url.QueryUnescape(k); err != nil || k != name || v == "" {
+			continue
+		}
+
+		parts := strings.Split(v, sep)
+		for i, p := range parts {
+			if u, err := url.QueryUnescape(p); err == nil {
+				parts[i] = u
+			}
+		}
+
+		return parts
+	}
+
+	return nil
+}
+
+// headerArgs are the literals of the header parameters h holds a value for.
+func headerArgs(params ir.Params, h http.Header) []ir.InteractionParam {
+	var args []ir.InteractionParam
+
+	for _, hp := range params {
+		if val := h.Get(hp.JSONName); val != "" {
+			args = append(args, ir.InteractionParam{FieldName: hp.FieldName, Literal: goLiteralForType(hp, val)})
+		}
+	}
+
+	return args
+}
+
+// setOutcome sets whether the call succeeded, and if not, the type of the error it returns, from the status recorded.
+func setOutcome(call *ir.InteractionCall, op *ir.Operation, status int) {
+	r := findResponse(op, status)
+	if r == nil {
+		// No declared response for this exact status code: fall back to the
+		// HTTP convention so the generated assertion at least checks err==nil
+		// vs err!=nil correctly, without asserting a specific error type.
+		call.IsSuccess = status >= 200 && status < 300
+		return
+	}
+
+	call.IsSuccess = r.IsSuccess
+
+	switch {
+	case r.IsSuccess:
+	case r.IsRawBytes:
+		// Nothing was decoded, so there is no generated type to match
+		// on: the client hands the body back as an api.ErrorBody.
+		call.ErrorType = "api.ErrorBody"
+	case r.GoType != nil:
+		call.ErrorType = r.GoType.String()
+	}
 }
 
 // fillGlobalParamExamples gives every global parameter the specification has no
@@ -306,9 +480,18 @@ func sliceLiteral(p ir.Param, values []string) string {
 }
 
 func goLiteralForType(p ir.Param, value string) string {
-	switch p.Type {
+	// a generated type takes the literal of the type it was declared from
+	switch cmp.Or(p.BaseType, p.Type) {
 	case "int", "int32", "int64", "uint", "uint32", "uint64", "float32", "float64", "bool":
 		return value
+	case "time.Duration":
+		return value + " * time.Second"
+	case "net.IP":
+		return fmt.Sprintf("net.ParseIP(%q)", value)
+	case "url.URL":
+		if u, err := url.Parse(value); err == nil {
+			return urlLiteral(u)
+		}
 	case "uuid.UUID":
 		return fmt.Sprintf("uuid.MustParse(%q)", value)
 	case "time.Time":
@@ -328,6 +511,26 @@ func goLiteralForType(p ir.Param, value string) string {
 	}
 
 	return fmt.Sprintf("%q", value)
+}
+
+// urlLiteral is a Go literal of u.
+func urlLiteral(u *url.URL) string {
+	var fields []string
+
+	for _, f := range []struct{ name, value string }{
+		{"Scheme", u.Scheme},
+		{"Opaque", u.Opaque},
+		{"Host", u.Host},
+		{"Path", u.Path},
+		{"RawQuery", u.RawQuery},
+		{"Fragment", u.Fragment},
+	} {
+		if f.value != "" {
+			fields = append(fields, fmt.Sprintf("%s: %q", f.name, f.value))
+		}
+	}
+
+	return "url.URL{" + strings.Join(fields, ", ") + "}"
 }
 
 // timeLiteral is a Go expression for t that keeps its offset, so it formats back to what was recorded.
@@ -410,10 +613,19 @@ func bodyLiteral(doc *ir.Document, goType string, v any) string {
 			if lit, ok := enumLiteral(s, v); ok {
 				return lit
 			}
+		case ir.SchemaKindAlias:
+			// a named scalar takes the scalar's literal, converted unless it is an alias
+			if lit, ok := scalarLiteral(s.Type, v); ok {
+				if s.IsTypeAlias {
+					return lit
+				}
+
+				return fmt.Sprintf("%s(%s)", goType, lit)
+			}
 		default:
 		}
 
-		// SchemaKindAlias, SchemaKindMap, SchemaKindUnion, or an enum value
+		// SchemaKindMap, SchemaKindUnion, an alias of no scalar, or an enum value
 		// that didn't match any declared member: not worth hand-rolling.
 	}
 

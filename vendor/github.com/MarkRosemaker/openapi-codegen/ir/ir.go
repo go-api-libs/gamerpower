@@ -75,8 +75,10 @@ type InteractionCall struct {
 	BodyLiteral string
 }
 
+// UsesMustDecodeBody reports whether the body literal decodes a value at test time, anywhere in it: a field of a
+// struct literal may, where the rest of it is written out.
 func (ic InteractionCall) UsesMustDecodeBody() bool {
-	return strings.HasPrefix(ic.BodyLiteral, "mustDecodeBody")
+	return strings.Contains(ic.BodyLiteral, "mustDecodeBody[")
 }
 
 // InteractionParam is one query param with its Go literal value.
@@ -394,18 +396,21 @@ func (ps Params) Required() bool {
 
 // Param represents a path or query parameter.
 type Param struct {
-	GlobalType   GlobalType `json:"globalType,omitzero"`
-	VarName      string     `json:"varName,omitzero"`
-	EnvName      string     `json:"envName,omitzero"`
-	GoName       string     `json:"goName,omitzero"`
-	FieldName    string     `json:"fieldName,omitzero"`
-	JSONName     string     `json:"jsonName,omitzero"`
-	Type         string     `json:"type,omitzero"`
-	Required     bool       `json:"required,omitzero"`
-	ParseExpr    string     `json:"parseExpr,omitzero"`
-	ParseCast    string     `json:"parseCast,omitzero"`
-	ParseErrFree bool       `json:"parseErrFree,omitzero"`
-	IsEnum       bool       `json:"isEnum,omitzero"`
+	GlobalType GlobalType `json:"globalType,omitzero"`
+	VarName    string     `json:"varName,omitzero"`
+	EnvName    string     `json:"envName,omitzero"`
+	GoName     string     `json:"goName,omitzero"`
+	FieldName  string     `json:"fieldName,omitzero"`
+	JSONName   string     `json:"jsonName,omitzero"`
+	Type       string     `json:"type,omitzero"`
+	Required   bool       `json:"required,omitzero"`
+	// ParseExpr parses the string it takes as %s: into Type alone if ParseErrFree, else into a value and an error, the
+	// value then converted by ParseConv.
+	ParseExpr string `json:"parseExpr,omitzero"`
+	// ParseConv converts what ParseExpr parsed, which it takes as %s, into Type, where that is not what it parsed.
+	ParseConv    string `json:"parseConv,omitzero"`
+	ParseErrFree bool   `json:"parseErrFree,omitzero"`
+	IsEnum       bool   `json:"isEnum,omitzero"`
 	// BaseType is the underlying Go type a generated Type was declared
 	// from -- e.g. "string" for an enum's Type "Status", or for any other
 	// named component built from a plain scalar. Set whenever Type came
@@ -420,10 +425,26 @@ type Param struct {
 	IsUnixTime  bool   `json:"isUnixTime,omitzero"`
 	Description string `json:"description,omitzero"`
 	// Item is one element of an array parameter, with v as its variable.
-	Item    *Param `json:"item,omitzero"`
-	Value   string `json:"value,omitzero"`   // the Go string literal of the one value the parameter can take
-	In      string `json:"in,omitzero"`      // where a fixed parameter goes: path, query or header
-	Example string `json:"example,omitzero"` // hardcoded example for tests
+	Item *Param `json:"item,omitzero"`
+	// Props are the members of an object parameter, each with the struct's field as its variable.
+	Props Params `json:"props,omitempty"`
+	// Pointer is set for a member of an object parameter whose field is a pointer, nil when the member is not sent.
+	Pointer bool `json:"pointer,omitzero"`
+	// MapValue is one value of a map parameter, with v as its variable.
+	MapValue *Param `json:"mapValue,omitzero"`
+	// Delimiter joins the values of an array, or the names and values of an object, sent as the one value of a query
+	// parameter: "," for form, "%20" for spaceDelimited and "|" for pipeDelimited, as OpenAPI 3.0 writes it, since a
+	// pipe within a value is escaped as %7C. Empty when each is sent on its own: an array's under the parameter's
+	// name, an object's under its own.
+	Delimiter string `json:"delimiter,omitzero"`
+	// DeepObject sends each member of an object under the parameter's name with the member's in brackets.
+	DeepObject bool `json:"deepObject,omitzero"`
+	// AllowReserved leaves the characters RFC 3986 reserves as they are in the query instead of escaping them, but for
+	// &, # and +, which would end the parameter, the query or stand for a space.
+	AllowReserved bool   `json:"allowReserved,omitzero"`
+	Value         string `json:"value,omitzero"`   // the Go string literal of the one value the parameter can take
+	In            string `json:"in,omitzero"`      // where a fixed parameter goes: path, query or header
+	Example       string `json:"example,omitzero"` // hardcoded example for tests
 }
 
 func (doc Document) APIKey() *Param {

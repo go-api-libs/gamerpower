@@ -5,12 +5,14 @@ package {{.PackageName}}
 import (
 	"context"
 	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/civil"
@@ -36,75 +38,18 @@ func RegisterService(svc Service, mux *http.ServeMux, pathPrefix string) {
 	mux.HandleFunc(fmt.Sprintf("{{ .Method }} %s", path), func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		l.DebugContext(ctx, "called")
-
-{{/* s and rawParam are shared temporaries: the parse expressions name s, and
-     a handler with two path parameters would otherwise redeclare both in the
-     same scope. Each is declared by the first parameter that needs it and
-     assigned by the rest. */}}
-{{- $sDeclared := false }}
-{{- $rawDeclared := false }}
-{{ range .PathParams}}
-		{{ if eq .ParseExpr "s"}}{{.GoName}} :={{else}}s {{ if $sDeclared }}={{ else }}:={{ end }}{{ $sDeclared = true }}{{end}} r.PathValue({{printf "%q" .JSONName}})
-{{- if .ParseErrFree}}{{ if ne .ParseExpr "s"}}
-		{{.GoName}} := {{.ParseExpr}}
-{{- end}}{{else}}
-		{{ if .ParseCast}}rawParam, err {{ if $rawDeclared }}={{ else }}:={{ end }}{{ $rawDeclared = true }}{{ else }}{{.GoName}}, err :={{ end }} {{.ParseExpr}}
+{{ with .ParseArgsFunc }}
+		{{ $op.ParseArgsResults }}, err := {{ . }}(r)
 		if err != nil {
-			msg := fmt.Sprintf("invalid {{.JSONName}}: %v", err)
+			msg := err.Error()
 			l.DebugContext(ctx, "Bad Request", slog.String("msg", msg))
 			http.Error(w, msg, http.StatusBadRequest)
 			return
 		}
-{{- if .ParseCast}}
-		{{.GoName}} := {{.ParseCast}}(rawParam)
-{{- end}}
-{{- end}}
-{{- end}}
-{{- if .QueryParams}}
-
-		var params {{.ParamStructName}}
-		q := r.URL.Query()
-{{- range $qp := .QueryParams}}
-{{- if .Item}}
-		for _, s := range q[{{printf "%q" .JSONName}}] {
-{{- with .Item}}
-{{- if .ParseErrFree}}
-			params.{{$qp.FieldName}} = append(params.{{$qp.FieldName}}, {{.ParseExpr}})
-{{- else}}
-			rawParam, err := {{.ParseExpr}}
-			if err != nil {
-				msg := fmt.Sprintf("invalid {{$qp.JSONName}}: %v", err)
-				l.DebugContext(ctx, "Bad Request", slog.String("msg", msg))
-				http.Error(w, msg, http.StatusBadRequest)
-				return
-			}
-
-			params.{{$qp.FieldName}} = append(params.{{$qp.FieldName}}, {{with .ParseCast}}{{.}}(rawParam){{else}}rawParam{{end}})
-{{- end}}
-{{- end}}
-		}
-{{- else}}
-		if s := q.Get({{printf "%q" .JSONName}}); s != "" {
-{{- if .ParseErrFree}}
-			params.{{.FieldName}} = {{.ParseExpr}}
-{{- else}}
-			rawParam, err := {{.ParseExpr}}
-			if err != nil {
-				msg := fmt.Sprintf("invalid {{.JSONName}}: %v", err)
-				l.DebugContext(ctx, "Bad Request", slog.String("msg", msg))
-				http.Error(w, msg, http.StatusBadRequest)
-				return
-			}
-{{- if .ParseCast}}
-			params.{{.FieldName}} = {{.ParseCast}}(rawParam)
-{{- else}}
-			params.{{.FieldName}} = rawParam
-{{- end}}
-{{- end}}
-		}
-{{- end}}
-{{- end}}
-{{- end}}
+{{ else }}{{ range .PathParams }}
+		{{ .GoName }} := {{ .ParsePath }}
+{{- end }}
+{{ end -}}
 {{- if .RequestBody}}
 		var body {{.RequestBody.TypeName}}
 		if err := json.UnmarshalRead(r.Body, &body, jsonOpts); err != nil {
@@ -178,3 +123,32 @@ func RegisterService(svc Service, mux *http.ServeMux, pathPrefix string) {
 	}
 {{end}}
 }
+{{- range .Operations }}{{ if .ParseArgsFunc }}
+
+{{ .ParseArgs }}
+{{- end }}{{ end }}
+{{- if .JoinsQuery }}
+
+// queryParts returns the parts of the value of the query parameter name in the query string raw, split at sep before
+// each is unescaped, so that a delimiter escaped within a part stays in it.
+func queryParts(raw, name, sep string) ([]string, error) {
+	for pair := range strings.SplitSeq(raw, "&") {
+		k, v, _ := strings.Cut(pair, "=")
+		if k, err := url.QueryUnescape(k); err != nil || k != name || v == "" {
+			continue
+		}
+
+		parts := strings.Split(v, sep)
+		for i, p := range parts {
+			var err error
+			if parts[i], err = url.QueryUnescape(p); err != nil {
+				return nil, err
+			}
+		}
+
+		return parts, nil
+	}
+
+	return nil, nil
+}
+{{- end }}

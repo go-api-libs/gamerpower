@@ -148,8 +148,8 @@ func mergeParams(pathItem, operation openapi.ParameterList) openapi.ParameterLis
 	return append(result, operation...)
 }
 
-// paramSchema is the schema a parameter is sent as. Null is dropped, a union of strings is a string,
-// and a union of an array and its items is the array: form style writes one value alike.
+// paramSchema is the schema a parameter is sent as. Null is dropped, a union of an array and its items is the array:
+// form style writes one value alike. Any other union is a string, the one type that can carry each of its values.
 func paramSchema(s *openapi.Schema) *openapi.Schema {
 	d := deref(s)
 	variants := d.OneOf
@@ -167,18 +167,20 @@ func paramSchema(s *openapi.Schema) *openapi.Schema {
 		return paramSchema(variants[0])
 	}
 
+	str := &openapi.Schema{Type: openapi.TypeString}
+
 	var array *openapi.Schema
 	for _, v := range variants {
 		switch deref(v).Type {
 		case openapi.TypeString:
 		case openapi.TypeArray:
 			if array != nil {
-				return s
+				return str
 			}
 
 			array = v
 		default:
-			return s
+			return str
 		}
 	}
 
@@ -186,7 +188,7 @@ func paramSchema(s *openapi.Schema) *openapi.Schema {
 		return array
 	}
 
-	return &openapi.Schema{Type: openapi.TypeString}
+	return str
 }
 
 // setType sets the parameter's Go type, and how to format and parse it, from s.
@@ -218,7 +220,18 @@ func (p *Param) setType(s *openapi.Schema) error {
 
 	p.IsUnixTime = p.Type == "time.Time" && deref(s).Type == openapi.TypeInteger
 
-	p.ParseExpr, p.ParseCast, p.ParseErrFree = tp.serverParseExpr()
+	if p.BaseType == "" {
+		p.ParseExpr, p.ParseConv, p.ParseErrFree = parseExpr(p.Type, p.IsUnixTime)
+		return nil
+	}
+
+	// a generated type is parsed as the type it was declared from, then converted
+	p.ParseExpr, p.ParseConv, p.ParseErrFree = parseExpr(p.BaseType, deref(s).Type == openapi.TypeInteger)
+	if p.ParseErrFree {
+		p.ParseExpr = p.Type + "(" + p.ParseExpr + ")"
+	} else {
+		p.ParseConv = p.Type + "(" + cmp.Or(p.ParseConv, "%s") + ")"
+	}
 
 	return nil
 }
@@ -233,22 +246,33 @@ func fromParam(p *openapi.Parameter, apiTitle string) (Param, error) {
 		return param, fmt.Errorf("schema is required")
 	}
 
+	param.GoName = strcase.ToGoCamel(p.Name)
+
+	param.FieldName = strcase.ToGoPascal(p.Name)
+
 	schema := paramSchema(p.Schema)
-	if items := deref(schema); items.Type == openapi.TypeArray && items.Items != nil {
+	switch d := deref(schema); {
+	case d.Type == openapi.TypeArray && d.Items != nil:
 		item := &Param{VarName: "v"}
-		if err := item.setType(paramSchema(items.Items)); err != nil {
+		if err := item.setType(paramSchema(d.Items)); err != nil {
 			return param, fmt.Errorf("items: %w", err)
 		}
 
 		param.Item = item
 		param.Type = "[]" + item.Type
-	} else if err := param.setType(schema); err != nil {
-		return param, err
+	case d.Type == openapi.TypeObject && p.In == openapi.ParameterLocationQuery:
+		if err := param.setObject(schema); err != nil {
+			return param, err
+		}
+	default:
+		if err := param.setType(schema); err != nil {
+			return param, err
+		}
 	}
 
-	param.GoName = strcase.ToGoCamel(p.Name)
-
-	param.FieldName = strcase.ToGoPascal(p.Name)
+	if p.In == openapi.ParameterLocationQuery {
+		param.setStyle(p)
+	}
 
 	if p.Required {
 		switch p.Name {
@@ -278,6 +302,10 @@ func fromParam(p *openapi.Parameter, apiTitle string) (Param, error) {
 		}
 	}
 
+	for i, prop := range param.Props {
+		param.Props[i].VarName = param.VarName + "." + prop.FieldName
+	}
+
 	// A nil example renders as the literal "null", which would reach the
 	// templates as a bare identifier rather than a Go string.
 	if param.GlobalType != "" && deref(p.Schema).Example != nil {
@@ -287,46 +315,52 @@ func fromParam(p *openapi.Parameter, apiTitle string) (Param, error) {
 	return param, nil
 }
 
-// serverParseExpr returns the expression that parses a string variable `s` into goType.
-// cast is a non-empty type name when the parse result needs casting (e.g. int32 from ParseInt).
-// errFree is true when the expression cannot return an error.
-func (tp GoType) serverParseExpr() (expr, cast string, errFree bool) {
-	switch tp.Name {
+// parseExpr is how a server parses a string into a value of the Go type named, as Param.ParseExpr, Param.ParseConv
+// and Param.ParseErrFree describe, reading what FormatExpr writes: an integer date-time as a Unix time and a duration
+// in whole seconds.
+func parseExpr(goType string, unixTime bool) (expr, conv string, errFree bool) {
+	switch goType {
 	case "string":
-		return "s", "", true
+		return "%s", "", true
 	case "types.Email":
-		return "types.Email(s)", "", true
+		return "types.Email(%s)", "", true
 	case "bool":
-		return "strconv.ParseBool(s)", "", false
+		return "strconv.ParseBool(%s)", "", false
 	case "int":
-		return "strconv.Atoi(s)", "", false
+		return "strconv.Atoi(%s)", "", false
 	case "int32":
-		return "strconv.ParseInt(s, 10, 32)", "int32", false
+		return "strconv.ParseInt(%s, 10, 32)", "int32(%s)", false
 	case "int64":
-		return "strconv.ParseInt(s, 10, 64)", "", false
+		return "strconv.ParseInt(%s, 10, 64)", "", false
 	case "uint":
-		return "strconv.ParseUint(s, 10, 64)", "uint", false
+		return "strconv.ParseUint(%s, 10, 64)", "uint(%s)", false
 	case "uint32":
-		return "strconv.ParseUint(s, 10, 32)", "uint32", false
+		return "strconv.ParseUint(%s, 10, 32)", "uint32(%s)", false
 	case "uint64":
-		return "strconv.ParseUint(s, 10, 64)", "", false
+		return "strconv.ParseUint(%s, 10, 64)", "", false
 	case "float32":
-		return "strconv.ParseFloat(s, 32)", "float32", false
+		return "strconv.ParseFloat(%s, 32)", "float32(%s)", false
 	case "float64":
-		return "strconv.ParseFloat(s, 64)", "", false
+		return "strconv.ParseFloat(%s, 64)", "", false
 	case "uuid.UUID":
-		return "uuid.Parse(s)", "", false
+		return "uuid.Parse(%s)", "", false
+	case "url.URL":
+		return "url.Parse(%s)", "*%s", false
 	case "time.Time":
-		return "time.Parse(time.RFC3339, s)", "", false
+		if unixTime {
+			return "strconv.ParseInt(%s, 10, 64)", "time.Unix(%s, 0)", false
+		}
+
+		return "time.Parse(time.RFC3339, %s)", "", false
 	case "civil.Date":
-		return "civil.ParseDate(s)", "", false
+		return "civil.ParseDate(%s)", "", false
 	case "net.IP":
-		return "net.ParseIP(s)", "", true
+		return "net.ParseIP(%s)", "", true
 	case "time.Duration":
-		return "time.ParseDuration(s)", "", false
+		return "strconv.ParseInt(%s, 10, 64)", "time.Duration(%s) * time.Second", false
 	default:
 		// string-based enum or other cast from string
-		return tp.Name + "(s)", "", true
+		return goType + "(%s)", "", true
 	}
 }
 
@@ -392,7 +426,10 @@ func segmentExpr(seg string, params map[string]Param) string {
 
 // NotZero returns the Go boolean expression that is true when param is not the zero value.
 func (p Param) NotZero() string {
-	if p.Item != nil {
+	switch {
+	case p.Pointer:
+		return p.VarName + " != nil"
+	case p.Item != nil, p.MapValue != nil:
 		return "len(" + p.VarName + ") > 0"
 	}
 
@@ -445,9 +482,13 @@ func (p Param) FormatExpr() string {
 	// That conversion is always legal, since it targets the generated
 	// type's own underlying type.
 	tp, v := p.Type, p.VarName
+	if p.Pointer {
+		v = "*" + v
+	}
+
 	if p.BaseType != "" {
 		tp = p.BaseType
-		v = tp + "(" + p.VarName + ")"
+		v = tp + "(" + v + ")"
 	}
 
 	switch tp {

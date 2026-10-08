@@ -199,6 +199,15 @@ async function apiFetch(path, options = {}) {
     }
 }
 
+{{ if .EscapesQuery -}}
+// esc escapes a value for a query string, a space as +, which keeps %20 for spaceDelimited's delimiter; escR leaves
+// the characters RFC 3986 reserves as they are, but for &, # and +.
+const esc = (v) => encodeURIComponent(String(v)).replace(/%20/g, "+");
+const escR = (v) => encodeURI(String(v)).replace(/[&#+]/g, encodeURIComponent).replace(/%20/g, "+").replace(/%5B/g, "[").replace(/%5D/g, "]");
+// join escapes each of parts and joins them by sep, escaping sep within a part.
+const join = (parts, sep, escape) => parts.map((p) => escape(p).replaceAll(sep, encodeURIComponent(sep))).join(sep);
+
+{{ end -}}
 // ====================== PUBLIC API ======================
 
 window.API = {
@@ -207,14 +216,11 @@ window.API = {
     {{ toGoComment . }}{{end}}
     {{.Name | camelCase}}: ({{- range $i, $p := .PathParams}}{{if $i}}, {{end}}{{$p.GoName}}{{end}}{{if .QueryParams}}{{if .PathParams}}, {{end}}params = {}{{end}}{{if .RequestBody}}{{if or .PathParams .QueryParams}}, {{end}}body{{end -}}) =>{{if .QueryParams}} {
         const q = new URLSearchParams({{- with .FixedQuery}}{{printf "%q" .}}{{end -}});
-        {{- range .QueryParams}}
-        {{- if .Item}}
-        for (const v of params.{{.GoName}} ?? []) q.append({{printf "%q" .JSONName}}, String(v));
-        {{- else}}
-        if (params.{{.GoName}} != null) q.set({{printf "%q" .JSONName}}, String(params.{{.GoName}}));
+        {{- if .EscapesQuery}}
+        const raw = [];
         {{- end}}
-        {{- end}}
-        return apiFetch(`{{.JSPathTemplate}}?${q}`, {
+        {{- .JSQuery}}
+        return apiFetch(`{{.JSPathTemplate}}?${ {{- .JSQueryString -}} }`, {
             {{- if ne .Method "GET"}}
             method: {{printf "%q" .Method}},
             {{- end}}
