@@ -285,15 +285,19 @@ func isTaggedUnion(s *openapi.Schema) bool {
 	return ok
 }
 
-// taggedShapeOf returns the members of the [Tagged] struct of the union u and those it requires, its shared ones and
-// its tag; ok is false if u is no such union.
+// taggedShapeOf returns the members of the [Tagged] struct of the union u and those it requires: those every
+// alternative does, of its shared ones and its tag. ok is false if u is no such union.
 func taggedShapeOf(u *openapi.Schema) (members, required []string, ok bool) {
 	shape, ok := taggedUnion(u, alternatives(u))
 	if !ok {
 		return nil, nil, false
 	}
 
-	members, required = []string{shape.tag}, []string{shape.tag}
+	// what it requires is what every alternative does: the tag too, unless one leaves it out
+	members = []string{shape.tag}
+	if !shape.tagOptional {
+		required = []string{shape.tag}
+	}
 
 	for _, p := range shape.shared {
 		members = append(members, p.name)

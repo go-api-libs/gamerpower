@@ -1,6 +1,7 @@
 package ir
 
 import (
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"fmt"
 	"slices"
@@ -261,7 +262,7 @@ func fieldVariants(variants openapi.SchemaList) ([]UnionVariant, []*openapi.Sche
 
 		uv := UnionVariant{FieldName: fieldName, Type: tp.String(), Zero: unsetValue(v, tp)}
 		uv.Members, uv.Required, uv.Object = objectShape(v)
-		uv.Pinned = pinnedMembers(v)
+		uv.Pinned, uv.Enums = allowedValues(v)
 		out = append(out, uv)
 		schemas = append(schemas, v)
 	}
@@ -654,32 +655,51 @@ func unsetValue(v *openapi.Schema, tp *GoType) string {
 	return ""
 }
 
-// pinnedMembers returns the members of the object s that allow one value, by a const or a one-value enum.
-func pinnedMembers(s *openapi.Schema) []PinnedMember {
-	var out []PinnedMember
-
+// allowedValues returns the members of the object s that allow one value, by a const or a one-value enum, and those
+// that allow the several values of an enum.
+func allowedValues(s *openapi.Schema) (pinned []PinnedMember, enums []EnumMember) {
 	for _, p := range orderedProperties(s) {
 		v := deref(p.schema)
 		if v == nil {
 			continue
 		}
 
-		value := v.Const
-		if len(value) == 0 && len(v.Enum) == 1 {
-			value = v.Enum[0]
-		}
+		if len(v.Const) > 0 || len(v.Enum) == 1 {
+			value := v.Const
+			if len(value) == 0 {
+				value = v.Enum[0]
+			}
 
-		if len(value) == 0 {
+			if c, ok := compactJSON(value); ok {
+				pinned = append(pinned, PinnedMember{Name: p.name, Value: c})
+			}
+
 			continue
 		}
 
-		c := slices.Clone(value)
-		if err := c.Compact(); err != nil {
+		if len(v.Enum) == 0 {
 			continue
 		}
 
-		out = append(out, PinnedMember{Name: p.name, Value: string(c)})
+		values := make([]string, 0, len(v.Enum))
+		for _, e := range v.Enum {
+			if c, ok := compactJSON(e); ok {
+				values = append(values, c)
+			}
+		}
+
+		enums = append(enums, EnumMember{Name: p.name, Values: values})
 	}
 
-	return out
+	return pinned, enums
+}
+
+// compactJSON is v written compactly, as a decoder compares it.
+func compactJSON(v jsontext.Value) (string, bool) {
+	c := slices.Clone(v)
+	if err := c.Compact(); err != nil {
+		return "", false
+	}
+
+	return string(c), true
 }

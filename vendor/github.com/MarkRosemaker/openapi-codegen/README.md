@@ -69,7 +69,11 @@ How the specification maps onto Go:
   set, and refuses a different one. Otherwise each alternative is tried in turn,
   and only where the value has the members it requires and the values it pins
   (`const` or a one-value `enum`), which decoding a struct alone does not check,
-  strict or lenient.
+  strict or lenient. A member of an `enum` of several values is checked too:
+  strict, a value outside it rules the alternative out; leniently, only while
+  another alternative fits, as an API may add a value. An alternative that is a
+  tagged union requires what every one of its own alternatives does, its tag
+  only if each requires it.
 - **Tagged unions** — a union whose alternatives differ only in a tag, a member
   each fixes to a string of its own, and in members of their own, such as
   Notion's blocks (`{"type": "paragraph", "paragraph": {...}}`), becomes one

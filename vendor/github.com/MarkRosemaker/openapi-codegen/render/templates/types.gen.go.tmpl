@@ -166,6 +166,9 @@ var variantsOf{{$typeName}} = []jsonVariant{
 		members:  map[string]bool{ {{- range .Members }}{{ printf "%q" . }}: true, {{ end -}} },
 		required: []string{ {{- range .Required }}{{ printf "%q" . }}, {{ end -}} },
 		pinned:   map[string]string{ {{- range .Pinned }}{{ printf "%q" .Name }}: {{ printf "%q" .Value }}, {{ end -}} },
+		{{- if .Enums }}
+		enums:    {{ template "enums" . }},
+		{{- end }}
 	},
 	{{- end }}
 }
@@ -353,7 +356,7 @@ func (v *{{$typeName}}) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	*v = {{$typeName}}{}
 
 	opts := jsonOptsOf(dec)
-	{{- if and $isOneOf (not .Discriminator) }}
+	{{- if or (and $isOneOf (not .Discriminator)) .HasEnums }}
 	strict := jsonStrict(dec)
 	{{- end }}
 
@@ -387,6 +390,11 @@ func (v *{{$typeName}}) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	{{- else }}
 
 	var matched int
+	{{- if .HasEnums }}
+
+	// a member outside its enum rules an alternative out; leniently, only while another fits
+	for _, enums := range jsonEnumPasses(strict) {
+	{{- end }}
 	{{- range .UnionVariants}}
 
 	{{ if $isOneOf -}}
@@ -395,10 +403,10 @@ func (v *{{$typeName}}) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	{{- else -}}
 	{
 	{{- end }}
-		{{- if or .Required .Pinned }}
+		{{- if or .Required .Pinned .Enums }}
 		// decoding checks neither the members the alternative requires nor those it pins to one value
 		required, pinned := {{ template "requiredAndPinned" . }}
-		if jsonFits(raw, required, pinned) {
+		if jsonFits(raw, required, pinned){{ if .Enums }} && (!enums || jsonEnumsFit(raw, {{ template "enums" . }})){{ end }} {
 			var vv {{.Type}}
 			if err := json.Unmarshal(raw, &vv, opts); err == nil {
 				{{ .Assign "v" }}
@@ -414,6 +422,13 @@ func (v *{{$typeName}}) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 		{{- end }}
 	}
 	{{- end}}
+	{{- if .HasEnums }}
+
+	if matched > 0 {
+		break
+	}
+	}
+	{{- end }}
 
 	{{ if $isOneOf -}}
 	if matched != 1 {
@@ -1031,6 +1046,54 @@ type jsonVariant struct {
 	required []string
 	// pinned are the members it allows one value for, written as compact JSON
 	pinned map[string]string
+	// enums are the members it allows the values of an enum for, written so
+	enums map[string][]string
+}
+
+// jsonEnumsFit reports whether each member of the JSON object raw that enums names has one of the values it allows,
+// written as compact JSON.
+func jsonEnumsFit(raw jsontext.Value, enums map[string][]string) bool {
+	if len(enums) == 0 {
+		return true
+	}
+
+	dec := jsontext.NewDecoder(bytes.NewReader(raw))
+	if tok, err := dec.ReadToken(); err != nil || tok.Kind() != jsontext.KindBeginObject {
+		return false
+	}
+
+	for dec.PeekKind() != jsontext.KindEndObject {
+		tok, err := dec.ReadToken()
+		if err != nil {
+			return false
+		}
+
+		name := tok.String()
+
+		val, err := dec.ReadValue()
+		if err != nil {
+			return false
+		}
+
+		if allowed, ok := enums[name]; ok {
+			got := val.Clone()
+			if err := got.Compact(); err != nil || !slices.Contains(allowed, string(got)) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// jsonEnumPasses are whether to check enums in each attempt at choosing an alternative: strict, always; leniently,
+// first, then not, should no alternative fit, as an API may add a value to an enum.
+func jsonEnumPasses(strict bool) []bool {
+	if strict {
+		return []bool{true}
+	}
+
+	return []bool{true, false}
 }
 
 // jsonFits reports whether the JSON value raw has the members required, and those of pinned it has with the value
@@ -1134,6 +1197,12 @@ func jsonChooseVariants(raw jsontext.Value, discriminator string, variants []jso
 			}
 
 			chosen = append(chosen, i)
+		}
+
+		// a member outside its enum rules an alternative out; leniently, only while another fits
+		fit := slices.DeleteFunc(slices.Clone(chosen), func(i int) bool { return !jsonEnumsFit(raw, variants[i].enums) })
+		if len(fit) > 0 || strict {
+			chosen = fit
 		}
 
 		switch {
@@ -1325,6 +1394,10 @@ func (v *{{$s.Name}}) MarshalJSONTo(enc *jsontext.Encoder) error {
 	return json.MarshalEncode(enc, (*plain)(&out), jsonOptsTo(enc))
 }
 {{- end }}{{ end }}
+
+{{- define "enums" -}}
+map[string][]string{ {{- range .Enums }}{{ printf "%q" .Name }}: { {{- range .Values }}{{ printf "%q" . }}, {{ end -}} }, {{ end -}} }
+{{- end }}
 
 {{- define "requiredAndPinned" -}}
 []string{ {{- range .Required }}{{ printf "%q" . }}, {{ end -}} }, map[string]string{ {{- range .Pinned }}{{ printf "%q" .Name }}: {{ printf "%q" .Value }}, {{ end -}} }

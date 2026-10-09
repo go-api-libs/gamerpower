@@ -284,6 +284,8 @@ type UnionVariant struct {
 	Object   bool     `json:"object,omitzero"`
 	// Pinned are the members the variant allows one value for, by its const or a one-value enum.
 	Pinned []PinnedMember `json:"pinned,omitempty"`
+	// Enums are the members the variant allows several values for, by an enum.
+	Enums []EnumMember `json:"enums,omitempty"`
 	// Path is set for a choice that is an alternative of a union nested in this one, however deep: the fields of the
 	// unions on the way to it, outermost first, each set to its union with the next one set.
 	Path []UnionStep `json:"path,omitempty"`
@@ -293,6 +295,17 @@ type UnionVariant struct {
 type PinnedMember struct {
 	Name  string `json:"name,omitzero"`
 	Value string `json:"value,omitzero"`
+}
+
+// EnumMember is a member an alternative allows the values of its enum for, each written as JSON.
+type EnumMember struct {
+	Name   string   `json:"name,omitzero"`
+	Values []string `json:"values,omitempty"`
+}
+
+// HasEnums reports whether an alternative of the union s allows a member only the values of its enum.
+func (s Schema) HasEnums() bool {
+	return slices.ContainsFunc(s.UnionVariants, func(v UnionVariant) bool { return len(v.Enums) > 0 })
 }
 
 // UnionStep is a field holding a nested union, on the way to one of its alternatives.
