@@ -8,8 +8,8 @@ github.com/MarkRosemaker/jsonutil v0.0.0-20261004011215-c1eff28436f6 h1:vXJlOaN8
 github.com/MarkRosemaker/jsonutil v0.0.0-20261004011215-c1eff28436f6/go.mod h1:SzjJlgYFlzpbFGvUUoQgfEsWlbai63bvhDPK8J0MNYM=
 github.com/MarkRosemaker/openapi v0.0.0-20261008160205-6fa860efe36e h1:0RkYVOkNffS+FuAlVWhJ58unLUOhNBx83R6wF+vEW3A=
 github.com/MarkRosemaker/openapi v0.0.0-20261008160205-6fa860efe36e/go.mod h1:RcEjbxD+KZGx/vKwk0s/+Pll+S5okqa9BVgb4DR4XtA=
-github.com/MarkRosemaker/openapi-codegen v0.0.0-20261009100219-1ca7b18a1eaf h1:UBe7OJM3a+D5XZOF6NMkdcdkEG7b6zCTpOd7Ap4z3c0=
-github.com/MarkRosemaker/openapi-codegen v0.0.0-20261009100219-1ca7b18a1eaf/go.mod h1:U5uCj07mhWl3Fus4o+ohsNU1Wyw5IbZzUpHsRnyYl50=
+github.com/MarkRosemaker/openapi-codegen v0.0.0-20261009161236-c3200e1467cb h1:pPg+uaXCmGFwsMYRSAFb1e0nrew0uGUjIFsLF42NPHs=
+github.com/MarkRosemaker/openapi-codegen v0.0.0-20261009161236-c3200e1467cb/go.mod h1:oeWfPqNIw2vM6mIgAfwB7yltVInU8T7domQCQlUCV3g=
 github.com/MarkRosemaker/openapi-compare v0.0.0-20261008160230-201b66284026 h1:eVY7KLN7abyeOft025A6mFunnSugANb8iW4HHXT5HyI=
 github.com/MarkRosemaker/openapi-compare v0.0.0-20261008160230-201b66284026/go.mod h1:06qWLuMtIGnd68g9KlFZ/iDAoLnDZCieB3uFN0h36+A=
 github.com/MarkRosemaker/openapi-compress v0.0.0-20261008184720-596edaeb762b h1:vm3m8PIvaK7/QhUzcSAtEeaIAUsuRHxQZRIZKU8+AEI=
@@ -50,10 +50,10 @@ golang.org/x/exp v0.0.0-20261007192929-f45ad48fbe92 h1:kc+Gi2MFkd0KWtdDlVxVwjw4K
 golang.org/x/exp v0.0.0-20261007192929-f45ad48fbe92/go.mod h1:SRjTzy5WcYqRRqquLUvHeeovSwLO0CZ3xcltZNO4Fck=
 golang.org/x/mod v0.41.0 h1:qJmnOUb4YB+FsEuM3HcWucdZASCPGhsX6uljO6pog0c=
 golang.org/x/mod v0.41.0/go.mod h1:Ek9pY8RKWXwsWvd3rQiHYtMqkjSUV+s1Rj7j4H5Ur6o=
-golang.org/x/sync v0.23.0 h1:KameEIfc1IkluZyXWLn39Wd4tURc6GbCiISGiZm2bQk=
-golang.org/x/sync v0.23.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
-golang.org/x/text v0.42.0 h1:JbOZXgfeCPU9gacVtYliJqOhD+zhrEqK4LfdpmlUZqI=
-golang.org/x/text v0.42.0/go.mod h1:ojzP1Z+2QtioaF8DTtO8K5q7JWVVYwZKenzujK0Zd0E=
+golang.org/x/sync v0.24.0 h1:iqiDrGoDgyuvAKrhLQthUEzU/R378N78gXbBjxed7oA=
+golang.org/x/sync v0.24.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
+golang.org/x/text v0.43.0 h1:1QivrlhwAsnMOcqgOdl9my7s9OyZl8O5/UGUTJVXoWc=
+golang.org/x/text v0.43.0/go.mod h1:hbSIYA/amXcRXTFSZqh8tWHEoqRvvbKPJ2uz/KU+a+s=
 golang.org/x/tools v0.51.0 h1:k4Xc/1Om9jwkBJBo4NVLMSARBoWtK10mx+W5BnXCeAI=
 golang.org/x/tools v0.51.0/go.mod h1:9eEncMayCV6zRMGhR5eZEC2iBx98qWcF1HZ9Z7wJOoA=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
