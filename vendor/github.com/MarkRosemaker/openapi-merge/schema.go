@@ -436,16 +436,31 @@ func cloneSchema(s *openapi.Schema) (*openapi.Schema, error) {
 	return clone, nil
 }
 
-// mergeItemBounds widens a's bounds on the number of items to cover b's too: an unbounded side leaves the result unbounded.
+// mergeItemBounds widens a's bounds on the number of items to cover b's too. A side that states no bound says nothing
+// of it, as a recorded array does not count its items, so the other's stands; but a maximum of zero only says the
+// array was seen empty, and an array seen empty allows no minimum.
 func mergeItemBounds(a, b *openapi.Schema) {
-	a.MinItems = min(a.MinItems, b.MinItems)
+	switch {
+	case seenEmpty(a) || seenEmpty(b):
+		a.MinItems = 0
+	case a.MinItems == 0 || b.MinItems == 0:
+		a.MinItems = max(a.MinItems, b.MinItems)
+	default:
+		a.MinItems = min(a.MinItems, b.MinItems)
+	}
 
-	if a.MaxItems != nil && b.MaxItems != nil {
+	switch {
+	case a.MaxItems != nil && b.MaxItems != nil:
 		a.MaxItems = new(max(*a.MaxItems, *b.MaxItems))
-	} else {
+	case a.MaxItems == nil && b.MaxItems != nil && *b.MaxItems > 0:
+		a.MaxItems = b.MaxItems
+	case a.MaxItems != nil && b.MaxItems == nil && *a.MaxItems == 0:
 		a.MaxItems = nil
 	}
 }
+
+// seenEmpty reports whether the array s allows no items: one recorded only empty.
+func seenEmpty(s *openapi.Schema) bool { return s.MaxItems != nil && *s.MaxItems == 0 }
 
 // mergeItemsField merges a.Items with b.Items. Either side may be nil,
 // meaning that side never saw inside the array at all -- e.g. because it was
@@ -803,12 +818,13 @@ func matchAlternative(
 		}
 
 		if len(union) > 0 {
+			// a union competes as its best alternative does: by its pinned properties, or else by how well b fits it
 			if _, f, p, ok := matchAlternative(union, b, anyFormat, discriminators); p {
 				if f > bestFit {
 					best, bestFit = i, f
 				}
-			} else if ok && fallback == -1 {
-				fallback = i
+			} else if ok && (fallback == -1 || f > fallbackFit) {
+				fallback, fallbackFit = i, f
 			}
 
 			continue
@@ -855,7 +871,7 @@ func matchAlternative(
 		return best, bestFit, true, true
 	}
 
-	return fallback, 0, false, fallback != -1
+	return fallback, fallbackFit, false, fallback != -1
 }
 
 // fitOf is how well b fits the branch s: twice the number of b's properties s declares, and one more if b has every
