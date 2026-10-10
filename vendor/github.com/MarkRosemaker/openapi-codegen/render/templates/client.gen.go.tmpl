@@ -455,6 +455,14 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 			return {{if $op.SuccessReturn}}nil, {{end}}nil
 			{{ end -}}
 		default:
+			{{ if $.Debug -}}
+			if c.debug {
+				if err := cassette.AddInteraction("api/interactions.json", ia); err != nil {
+					return {{if $op.SuccessReturn}}nil, {{end}}errors.Join(api.NewErrUnknownContentType(rsp), err)
+				}
+			}
+
+			{{ end -}}
 			return {{if $op.SuccessReturn}}nil, {{end}}api.NewErrUnknownContentType(rsp)
 		}
 {{- else}}
@@ -463,6 +471,14 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 {{- end}}
 	{{ if not .Responses.HasDefault -}}
 	default:
+		{{ if $.Debug -}}
+		if c.debug {
+			if err := cassette.AddInteraction("api/interactions.json", ia); err != nil {
+				return {{if $op.SuccessReturn}}nil, {{end}}errors.Join(api.NewErrUnknownStatusCode(rsp), err)
+			}
+		}
+
+		{{ end -}}
 		return {{if .SuccessReturn}}nil, {{end}}api.NewErrUnknownStatusCode(rsp)
 	{{ end -}}
 	}
