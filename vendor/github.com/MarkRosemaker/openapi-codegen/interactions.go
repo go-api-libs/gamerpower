@@ -40,7 +40,7 @@ func matchInteractions(doc *ir.Document, interactions cassette.Interactions) err
 }
 
 // interactionCall is the call of the operation ia was made to, with the arguments it was made with.
-func interactionCall(doc *ir.Document, ia cassette.Interaction) (ir.InteractionCall, error) {
+func interactionCall(doc *ir.Document, ia *cassette.Interaction) (ir.InteractionCall, error) {
 	u, err := url.Parse(ia.Request.URL)
 	if err != nil {
 		return ir.InteractionCall{}, err

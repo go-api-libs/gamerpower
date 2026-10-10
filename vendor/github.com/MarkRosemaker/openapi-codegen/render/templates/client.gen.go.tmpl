@@ -411,7 +411,7 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 					return {{if $op.SuccessReturn}}nil, {{end}}api.WrapDecodingError(rsp, err)
 				}
 
-				if err2 := cassette.AddInteraction("api/interactions.json", ia); err2 != nil {
+				if err2 := cassette.AddInteraction("api/interactions.json", &ia); err2 != nil {
 					return {{if $op.SuccessReturn}}nil, {{end}}errors.Join(api.WrapDecodingError(rsp, err), err2)
 				}
 
@@ -457,7 +457,7 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 		default:
 			{{ if $.Debug -}}
 			if c.debug {
-				if err := cassette.AddInteraction("api/interactions.json", ia); err != nil {
+				if err := cassette.AddInteraction("api/interactions.json", &ia); err != nil {
 					return {{if $op.SuccessReturn}}nil, {{end}}errors.Join(api.NewErrUnknownContentType(rsp), err)
 				}
 			}
@@ -473,7 +473,7 @@ func (c *Client) {{.Name}}(ctx context.Context{{range .PathParams}}, {{.GoName}}
 	default:
 		{{ if $.Debug -}}
 		if c.debug {
-			if err := cassette.AddInteraction("api/interactions.json", ia); err != nil {
+			if err := cassette.AddInteraction("api/interactions.json", &ia); err != nil {
 				return {{if $op.SuccessReturn}}nil, {{end}}errors.Join(api.NewErrUnknownStatusCode(rsp), err)
 			}
 		}
