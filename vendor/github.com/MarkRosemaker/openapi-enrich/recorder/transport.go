@@ -92,7 +92,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	t.Interactions = append(t.Interactions, cassette.Interaction{
+	t.Interactions = append(t.Interactions, &cassette.Interaction{
 		Request:  cReq,
 		Response: cResp,
 	})

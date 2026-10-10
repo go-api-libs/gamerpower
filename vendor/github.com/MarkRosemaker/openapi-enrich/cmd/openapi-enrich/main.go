@@ -104,7 +104,7 @@ func run(ctx context.Context) error {
 	}
 
 	if scaffoldNext {
-		ias = append(ias, cassette.Interaction{})
+		ias = append(ias, &cassette.Interaction{})
 	}
 
 	if err := ias.WriteFile(iaPath); err != nil {

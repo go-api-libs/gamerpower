@@ -20,7 +20,7 @@ func Enrich(doc *openapi.Document, interactions cassette.Interactions) error {
 	inferTypes(doc)
 
 	for _, ia := range interactions {
-		if err := analyzeInteraction(doc, &ia); err != nil {
+		if err := analyzeInteraction(doc, ia); err != nil {
 			return fmt.Errorf("%s %s: %w", ia.Request.Method, ia.Request.URL, err)
 		}
 	}

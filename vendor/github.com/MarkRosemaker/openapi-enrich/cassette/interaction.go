@@ -9,7 +9,7 @@ import (
 )
 
 // Interactions represents a collection of interactions.
-type Interactions []Interaction
+type Interactions []*Interaction
 
 // Interaction represents a single observed HTTP request/response pair.
 type Interaction struct {
