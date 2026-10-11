@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/MarkRosemaker/cassette"
 	"github.com/MarkRosemaker/errpath"
 	"github.com/MarkRosemaker/openapi"
-	"github.com/MarkRosemaker/openapi-enrich/cassette"
 	merge "github.com/MarkRosemaker/openapi-merge"
 )
 
@@ -24,10 +24,7 @@ const (
 )
 
 func analyzeInteraction(doc *openapi.Document, ia *cassette.Interaction) error {
-	reqURL, err := url.Parse(ia.Request.URL)
-	if err != nil {
-		return fmt.Errorf("parsing request URL: %w", err)
-	}
+	reqURL := new(ia.Request.URL)
 
 	// 1. Initialize doc.Servers[0] from the first request if empty.
 	// Use scheme+host only; path prefixes (e.g. versioning) are the caller's responsibility.

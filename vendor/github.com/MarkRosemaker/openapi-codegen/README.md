@@ -45,7 +45,13 @@ rest of the family before generating anything:
 - **types** — structs, enums, and type aliases for all referenced schemas
 - **client** — typed HTTP client with per-operation methods
 - **server** — `http.Handler`-based server scaffold
-- **tests** — round-trip and cassette-backed tests, generated from recorded traffic
+- **tests** — round-trip and cassette-backed tests, generated from recorded traffic.
+  The replay test plays every recorded call back with `cassette.Replay` from
+  [cassette](https://github.com/MarkRosemaker/cassette), in order, with its method, URL (its query in any order),
+  body and headers but the `User-Agent` exact, and fails on any recording never
+  called. To mock a generated client in your own tests, pass
+  `WithHTTPClient(&http.Client{Transport: cassette.Replay(interactions)})`: each
+  request is answered from the recording it matches, without the network.
 - **JavaScript client** — optional `api.js` alongside the Go output
 
 Identifiers are sanitized into valid, idiomatic Go: leading digits are spelled out,
@@ -105,8 +111,10 @@ How the specification maps onto Go:
   that could be supported but has no real example yet, such as an `allOf` of two
   unions, is generated with methods that return an "unimplemented" error.
 - **Debug mode** — with `-debug`, a client given `WithDebug` records each
-  response it fails to decode to `api/interactions.json`, for `openapi-enrich` to
-  learn from, then decodes it again without rejecting members the specification
+  response it fails to decode to `api/interactions.json`, or `WithDebugFile`'s
+  path, for `openapi-enrich` to learn from: masked, right away, and once,
+  however often the same call fails. It then decodes it again without rejecting
+  members the specification
   does not know. Only if that fails too does the call fail, so a response that
   merely holds more than the specification says still reaches the caller.
   Nothing the specification leaves open decodes into `any` then: the empty

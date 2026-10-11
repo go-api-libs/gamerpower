@@ -2,10 +2,14 @@ package cassette
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json/jsontext"
 	"io"
 	"net/http"
+	"net/url"
+	"slices"
+	"strings"
 )
 
 // Interactions represents a collection of interactions.
@@ -19,8 +23,10 @@ type Interaction struct {
 
 // Request represents an observed HTTP request.
 type Request struct {
-	Method  string      `json:"method"`
-	URL     string      `json:"url"`
+	Method string `json:"method"`
+	// URL is the URL requested, its query parameters sorted by name. A scaffold, a request yet to
+	// be made, has none.
+	URL     url.URL     `json:"url"`
 	Headers http.Header `json:"header,omitempty"`
 	Body    Body        `json:"body,omitempty"`
 	// BodyOmitted is set for a body that was not text, see [IsText], which is not recorded.
@@ -32,7 +38,7 @@ type Request struct {
 func NewRequest(req *http.Request) (Request, error) {
 	r := Request{
 		Method:  req.Method,
-		URL:     req.URL.String(),
+		URL:     normalizeURL(*req.URL),
 		Headers: req.Header.Clone(),
 	}
 
@@ -61,7 +67,7 @@ func NewRequest(req *http.Request) (Request, error) {
 
 // Create creates a corresponding [*http.Request].
 func (r Request) Create(ctx context.Context) (*http.Request, error) {
-	req, err := http.NewRequestWithContext(ctx, r.Method, r.URL, func() io.Reader {
+	req, err := http.NewRequestWithContext(ctx, r.Method, r.URL.String(), func() io.Reader {
 		if r.Body == nil {
 			return nil
 		}
@@ -77,6 +83,34 @@ func (r Request) Create(ctx context.Context) (*http.Request, error) {
 	}
 
 	return req, nil
+}
+
+// IsScaffold reports whether r is a request yet to be made: one without a URL.
+func (r Request) IsScaffold() bool { return r.URL == (url.URL{}) }
+
+// normalizeURL returns u with its query parameters stably sorted by name, so that two requests that differ only in
+// their order are recorded alike. Each parameter is kept as it was written: re-escaping it, as [url.Values.Encode]
+// does, would turn a delimiter such as the comma of ids=1,2 into %2C.
+func normalizeURL(u url.URL) url.URL {
+	if u.RawQuery == "" {
+		return u
+	}
+
+	params := strings.Split(u.RawQuery, "&")
+	slices.SortStableFunc(params, func(a, b string) int { return cmp.Compare(queryName(a), queryName(b)) })
+	u.RawQuery = strings.Join(params, "&")
+
+	return u
+}
+
+// queryName is the unescaped name of the query parameter param, written as name=value.
+func queryName(param string) string {
+	name, _, _ := strings.Cut(param, "=")
+	if unescaped, err := url.QueryUnescape(name); err == nil {
+		return unescaped
+	}
+
+	return name
 }
 
 // Response represents an observed HTTP response.

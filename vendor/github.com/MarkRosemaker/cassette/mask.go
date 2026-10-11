@@ -3,12 +3,13 @@ package cassette
 import (
 	"bytes"
 	"encoding/json/jsontext"
+	"net/url"
 	"regexp"
 	"strings"
 	"unicode"
 )
 
-// Masker configures which recorded values [Interactions.MaskWith] redacts.
+// masker configures which recorded values [Interactions.Mask] redacts.
 //
 // Redaction is shape-preserving: a masked e-mail address is replaced by another
 // e-mail address, a masked UUID by another UUID, a masked number by a number.
@@ -18,7 +19,7 @@ import (
 //
 // The placeholders describe one fictional person: John Doe, johndoe,
 // john.doe@example.com. A reader who meets one of them recognises the rest.
-type Masker struct {
+type masker struct {
 	// HeaderKeys are header names whose values are redacted, in requests and
 	// responses alike. Matching is case-insensitive.
 	HeaderKeys []string
@@ -75,7 +76,7 @@ type Masker struct {
 	KeepEmails bool
 }
 
-func (m Masker) rules() rules {
+func (m masker) rules() rules {
 	return rules{
 		headers:   lowerSet(m.HeaderKeys),
 		keys:      lowerSet(m.BodyKeys),
@@ -87,19 +88,22 @@ func (m Masker) rules() rules {
 	}
 }
 
-// DefaultMasker returns the configuration used by [Interactions.Mask]: the
+// defaultMasker returns the configuration used by [Interactions.Mask]: the
 // headers and body keys that carry credentials in most APIs.
 //
 // It knows nothing about which identifiers are yours. A recording that carries
 // an account ID under a generic key such as "id" needs that key listed in
-// [Masker.IDKeys], or the value itself in [Masker.Values].
-func DefaultMasker() Masker {
-	return Masker{
+// IDKeys, or the value itself in Values.
+//
+// X-Client is not masked: an API such as Habitica uses it to name the tool
+// calling it, and a replayed call must send it as recorded.
+func defaultMasker() masker {
+	return masker{
 		HeaderKeys: []string{
 			"Authorization", "Proxy-Authorization",
 			"Cookie", "Set-Cookie",
 			"X-Api-Key", "X-Api-User", "X-Api-Token",
-			"X-Auth-Token", "X-Client", "X-Csrf-Token",
+			"X-Auth-Token", "X-Csrf-Token",
 			"X-Rd-Token", "X-Session-Id",
 		},
 		BodyKeys: []string{
@@ -116,7 +120,7 @@ func DefaultMasker() Masker {
 	}
 }
 
-// rules is the compiled form of a [Masker]: key sets rather than slices.
+// rules is the compiled form of a [masker]: key sets rather than slices.
 type rules struct {
 	headers, keys, ids, names, usernames map[string]bool
 	values                               []string
@@ -129,19 +133,16 @@ type scope struct {
 	all, id, name, username bool
 }
 
-// Mask redacts sensitive values in place using [DefaultMasker].
-func (ia *Interaction) Mask() { ia.MaskWith(DefaultMasker()) }
-
-// MaskWith redacts sensitive values in place according to m.
-func (ia *Interaction) MaskWith(m Masker) {
+// maskWith redacts sensitive values in place according to m.
+func (ia *Interaction) maskWith(m masker) {
 	ia.mask(m.rules())
 }
 
-// Mask redacts sensitive values in place using [DefaultMasker].
-func (ias Interactions) Mask() { ias.MaskWith(DefaultMasker()) }
+// Mask redacts credentials in place: in headers, in bodies and in query values.
+func (ias Interactions) Mask() { ias.maskWith(defaultMasker()) }
 
-// MaskWith redacts sensitive values in place according to m.
-func (ias Interactions) MaskWith(m Masker) {
+// maskWith redacts sensitive values in place according to m.
+func (ias Interactions) maskWith(m masker) {
 	r := m.rules()
 	for _, ia := range ias {
 		ia.mask(r)
@@ -151,6 +152,8 @@ func (ias Interactions) MaskWith(m Masker) {
 func (ia *Interaction) mask(r rules) {
 	maskHeaders(ia.Request.Headers, r.headers)
 	maskHeaders(ia.Response.Headers, r.headers)
+
+	ia.Request.URL.RawQuery = maskQuery(ia.Request.URL.RawQuery, r.keys)
 
 	ia.Request.Body = maskBody(ia.Request.Body, r)
 	ia.Response.Body = maskBody(ia.Response.Body, r)
@@ -178,6 +181,31 @@ func maskHeaders(h map[string][]string, keys map[string]bool) {
 
 		h[k] = masked
 	}
+}
+
+// maskQuery masks the values of the query parameters raw holds whose names are among keys, as it does the members of a
+// body; every other parameter is kept as it was written.
+func maskQuery(raw string, keys map[string]bool) string {
+	if raw == "" {
+		return raw
+	}
+
+	params := strings.Split(raw, "&")
+	for i, param := range params {
+		name, value, ok := strings.Cut(param, "=")
+		if !ok || !keys[strings.ToLower(queryName(param))] {
+			continue
+		}
+
+		if unescaped, err := url.QueryUnescape(value); err == nil {
+			value = unescaped
+		}
+
+		// the asterisks of a masked value need no escaping, and read better without
+		params[i] = name + "=" + strings.ReplaceAll(url.QueryEscape(maskString(value)), "%2A", "*")
+	}
+
+	return strings.Join(params, "&")
 }
 
 // maskBody rewrites b according to r. A body that is not valid JSON is returned
@@ -392,7 +420,7 @@ const (
 	maskedMAC           = "00:00:00:00:00:00"
 )
 
-// RedactsBodyKey reports whether [DefaultMasker] redacts values held by key.
+// RedactsBodyKey reports whether [Interactions.Mask] redacts values held by key.
 //
 // A masked string announces itself — the zero UUID and the asterisk run are
 // recognisable by [IsMasked] — but a masked number does not: a redacted count
@@ -400,7 +428,7 @@ const (
 // remaining signal, so callers documenting a masked recording can ask about it
 // directly rather than guessing from the value.
 func RedactsBodyKey(key string) bool {
-	return lowerSet(DefaultMasker().BodyKeys)[strings.ToLower(key)]
+	return lowerSet(defaultMasker().BodyKeys)[strings.ToLower(key)]
 }
 
 // IsMasked reports whether s is a placeholder produced by masking.

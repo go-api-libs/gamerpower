@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/MarkRosemaker/cassette"
 	"github.com/MarkRosemaker/openapi"
-	"github.com/MarkRosemaker/openapi-enrich/cassette"
 	"github.com/ettle/strcase"
 )
 

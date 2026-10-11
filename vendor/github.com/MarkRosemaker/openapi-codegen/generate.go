@@ -8,10 +8,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/MarkRosemaker/cassette"
 	"github.com/MarkRosemaker/openapi"
 	"github.com/MarkRosemaker/openapi-codegen/ir"
 	"github.com/MarkRosemaker/openapi-codegen/render"
-	"github.com/MarkRosemaker/openapi-enrich/cassette"
 	"github.com/spf13/afero"
 )
 

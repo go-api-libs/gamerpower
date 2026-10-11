@@ -46,6 +46,10 @@ func WithBaseURL(baseURL *url.URL) ClientOption {
 }
 
 // WithHTTPClient returns a [ClientOption] that sets a custom HTTP client.
+//
+// To mock the client in tests, pass one whose Transport is cassette.Replay(interactions), from
+// github.com/MarkRosemaker/cassette: it answers each request from the recorded interaction it matches,
+// and fails any other, without the network.
 func WithHTTPClient(cli *http.Client) ClientOption {
 	return func(c *Client) { c.cli = cli }
 }

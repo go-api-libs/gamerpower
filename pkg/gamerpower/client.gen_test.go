@@ -5,20 +5,15 @@
 package gamerpower
 
 import (
-	"bytes"
 	"encoding/json/jsontext"
 	"errors"
-	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"slices"
-	"strings"
 	"testing"
 
-	"github.com/MarkRosemaker/openapi-enrich/cassette"
+	"github.com/MarkRosemaker/cassette"
 	"github.com/go-api-libs/api"
 )
 
@@ -232,67 +227,17 @@ func replay(t *testing.T) http.RoundTripper {
 		t.Fatal(err)
 	}
 
-	var idx int
-	return roundTripFunc(func(req *http.Request) (*http.Response, error) {
-		if idx >= len(interactions) {
-			return nil, fmt.Errorf("unexpected request: %s %s", req.Method, req.URL)
+	rec := cassette.Replay(interactions, cassette.InOrder(), cassette.WithMatcher(cassette.MatchRequest(
+		cassette.CompareHeaders("User-Agent"),
+	)))
+
+	t.Cleanup(func() {
+		if unused := rec.Unused(); len(unused) > 0 {
+			t.Errorf("%d recorded interactions were never replayed, the first: %s %s", len(unused), unused[0].Request.Method, &unused[0].Request.URL)
 		}
-
-		ia := interactions[idx]
-
-		r, err := cassette.NewRequest(req)
-		if err != nil {
-			return nil, err
-		}
-
-		if r.URL != ia.Request.URL {
-			return nil, fmt.Errorf("interaction #%d: got URL %s, want %s", idx, r.URL, ia.Request.URL)
-		}
-
-		if r.Method != ia.Request.Method {
-			return nil, fmt.Errorf("interaction #%d: got method %s, want %s", idx, r.Method, ia.Request.Method)
-		}
-
-		gotBody := jsontext.Value(r.Body)
-		gotBody.Canonicalize()
-
-		wantBody := jsontext.Value(ia.Request.Body)
-		wantBody.Canonicalize()
-
-		if !bytes.Equal(gotBody, wantBody) {
-			return nil, fmt.Errorf("interaction #%d: got body %s, want %s", idx, string(gotBody), string(wantBody))
-		}
-
-		if ia.Request.Headers == nil {
-			ia.Request.Headers = http.Header{}
-		}
-
-		ia.Request.Headers.Set("User-Agent", defaultUserAgent)
-
-		if len(ia.Request.Body) == 0 {
-			ia.Request.Headers.Del("Content-Type")
-		}
-
-		gotScheme, _, _ := strings.Cut(r.Headers.Get("Authorization"), " ")
-		wantScheme, _, _ := strings.Cut(ia.Request.Headers.Get("Authorization"), " ")
-		if gotScheme != wantScheme {
-			return nil, fmt.Errorf("interaction #%d: got Authorization scheme %q, want %q", idx, gotScheme, wantScheme)
-		}
-		r.Headers.Del("Authorization")
-		ia.Request.Headers.Del("Authorization")
-
-		if !maps.EqualFunc(r.Headers, ia.Request.Headers, slices.Equal) {
-			return nil, fmt.Errorf("interaction #%d: got headers %s, want %s", idx, r.Headers, ia.Request.Headers)
-		}
-
-		idx++
-		return &http.Response{
-			Status:     fmt.Sprintf("%d %s", ia.Response.StatusCode, http.StatusText(ia.Response.StatusCode)),
-			StatusCode: ia.Response.StatusCode,
-			Header:     ia.Response.Headers.Clone(),
-			Body:       io.NopCloser(bytes.NewReader(ia.Response.Body)),
-		}, nil
 	})
+
+	return rec
 }
 
 func TestClient_Interactions(t *testing.T) {

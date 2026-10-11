@@ -1,9 +1,9 @@
 package codegen
 
 import (
+	"github.com/MarkRosemaker/cassette"
 	"github.com/MarkRosemaker/openapi"
 	"github.com/MarkRosemaker/openapi-codegen/config"
-	"github.com/MarkRosemaker/openapi-enrich/cassette"
 	"github.com/spf13/afero"
 )
 

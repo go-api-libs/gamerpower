@@ -7,9 +7,9 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/MarkRosemaker/cassette"
 	"github.com/MarkRosemaker/errpath"
 	"github.com/MarkRosemaker/openapi"
-	"github.com/MarkRosemaker/openapi-enrich/cassette"
 )
 
 // growEnums walks s and the raw JSON body it was inferred from in parallel,

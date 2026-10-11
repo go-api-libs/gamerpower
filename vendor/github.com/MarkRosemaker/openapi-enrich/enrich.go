@@ -6,8 +6,8 @@ package enrich
 import (
 	"fmt"
 
+	"github.com/MarkRosemaker/cassette"
 	"github.com/MarkRosemaker/openapi"
-	"github.com/MarkRosemaker/openapi-enrich/cassette"
 )
 
 // Enrich updates doc in place based on observed HTTP interactions.
@@ -21,7 +21,7 @@ func Enrich(doc *openapi.Document, interactions cassette.Interactions) error {
 
 	for _, ia := range interactions {
 		if err := analyzeInteraction(doc, ia); err != nil {
-			return fmt.Errorf("%s %s: %w", ia.Request.Method, ia.Request.URL, err)
+			return fmt.Errorf("%s %s: %w", ia.Request.Method, &ia.Request.URL, err)
 		}
 	}
 

@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MarkRosemaker/cassette"
 	"github.com/MarkRosemaker/openapi-codegen/ir"
-	"github.com/MarkRosemaker/openapi-enrich/cassette"
 )
 
 // matchInteractions populates doc.InteractionCalls by matching each interaction
@@ -24,8 +24,8 @@ func matchInteractions(doc *ir.Document, interactions cassette.Interactions) err
 	fillGlobalParamExamples(doc, interactions)
 
 	for _, ia := range interactions {
-		if ia.Request.URL == "" {
-			continue // just a scaffold
+		if ia.Request.IsScaffold() {
+			continue
 		}
 
 		call, err := interactionCall(doc, ia)
@@ -41,14 +41,11 @@ func matchInteractions(doc *ir.Document, interactions cassette.Interactions) err
 
 // interactionCall is the call of the operation ia was made to, with the arguments it was made with.
 func interactionCall(doc *ir.Document, ia *cassette.Interaction) (ir.InteractionCall, error) {
-	u, err := url.Parse(ia.Request.URL)
-	if err != nil {
-		return ir.InteractionCall{}, err
-	}
+	u := &ia.Request.URL
 
 	op, pathVals := pickOperation(doc.Operations, ia.Request.Method, relativePath(u.Path, doc.BaseURL.Path))
 	if op == nil {
-		return ir.InteractionCall{}, fmt.Errorf("interaction %s %s: no matching operation found", ia.Request.Method, ia.Request.URL)
+		return ir.InteractionCall{}, fmt.Errorf("interaction %s %s: no matching operation found", ia.Request.Method, u)
 	}
 
 	call := ir.InteractionCall{

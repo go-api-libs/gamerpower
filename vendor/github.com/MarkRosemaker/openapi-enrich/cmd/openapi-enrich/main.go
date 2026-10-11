@@ -2,18 +2,20 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"encoding/json/jsontext"
 	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
+	"net/http"
 	"os"
 	"slices"
-	"strings"
 
+	"github.com/MarkRosemaker/cassette"
 	"github.com/MarkRosemaker/openapi"
+	edit "github.com/MarkRosemaker/openapi-edit"
 	enrich "github.com/MarkRosemaker/openapi-enrich"
-	"github.com/MarkRosemaker/openapi-enrich/cassette"
-	"github.com/MarkRosemaker/openapi-enrich/recorder"
 )
 
 func main() {
@@ -53,7 +55,8 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	tr := recorder.NewTransport(nil, prevIas)
+	// send what has no response yet, and keep what has
+	tr := cassette.Replay(prevIas, cassette.RecordMisses(&localhostInsecureTransport{}))
 
 	scaffoldNext := len(prevIas) == 0
 
@@ -63,7 +66,7 @@ func run(ctx context.Context) error {
 			continue // we have a response
 		}
 
-		if ia.Request.URL == "" {
+		if ia.Request.IsScaffold() {
 			scaffoldNext = true
 			continue
 		}
@@ -77,31 +80,32 @@ func run(ctx context.Context) error {
 			req.Header.Set("Authorization", auth)
 		}
 
-		if _, err := tr.RoundTrip(req); err != nil {
+		rsp, err := tr.RoundTrip(req)
+		if err != nil {
 			return err
 		}
+
+		rsp.Body.Close()
 	}
 
-	ias := tr.Interactions
-
-	if strings.HasPrefix(doc.Info.Title, "Habitica") {
-		// for them, "X-Client" is more like a user agent - they're weird that way
-		m := cassette.DefaultMasker()
-		if i := slices.Index(m.HeaderKeys, "X-Client"); i > -1 {
-			m.HeaderKeys = slices.Delete(m.HeaderKeys, i, i+1)
+	// what was recorded before, then what was recorded now; a request answered from a recording is that recording
+	ias := slices.DeleteFunc(slices.Clone(prevIas), func(ia *cassette.Interaction) bool { return ia.Response.StatusCode == 0 })
+	for _, ia := range tr.Interactions() {
+		if !slices.Contains(prevIas, ia) {
+			ias = append(ias, ia)
 		}
-
-		ias.MaskWith(m)
-	} else {
-		ias.Mask()
 	}
+
+	ias.Mask()
 
 	ias.TrimResponseHeaders()
 	ias.TrimBodies(cassette.MaxStringLen)
 
 	if trimExamples > 0 {
-		ias.TrimResponseBodies(trimExamples)
+		trimResponseBodies(ias, trimExamples)
 	}
+
+	recorded := ias
 
 	if scaffoldNext {
 		ias = append(ias, &cassette.Interaction{})
@@ -111,7 +115,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	if err := enrich.Enrich(doc, tr.Interactions); err != nil {
+	if err := enrich.Enrich(doc, recorded); err != nil {
 		return err
 	}
 
@@ -135,4 +139,35 @@ func run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// trimResponseBodies cuts every response body's own arrays down to at most maxItems representative elements, at any
+// depth, see [edit.TrimExample]. A body that is empty or not valid JSON is left as it is.
+func trimResponseBodies(ias cassette.Interactions, maxItems int) {
+	for _, ia := range ias {
+		if len(ia.Response.Body) == 0 {
+			continue
+		}
+
+		if trimmed, err := edit.TrimExample(jsontext.Value(ia.Response.Body), maxItems); err == nil {
+			ia.Response.Body = cassette.Body(trimmed)
+		}
+	}
+}
+
+// localhostInsecureTransport is [http.DefaultTransport], but for localhost, whose certificate is self-signed.
+type localhostInsecureTransport struct{}
+
+var insecureTransport = &http.Transport{
+	// self-signed cert; safe because it's localhost only
+	TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+}
+
+// RoundTrip implements [http.RoundTripper].
+func (localhostInsecureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.URL.Hostname() == "localhost" {
+		return insecureTransport.RoundTrip(req)
+	}
+
+	return http.DefaultTransport.RoundTrip(req)
 }

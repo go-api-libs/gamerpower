@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/MarkRosemaker/cassette"
 	"github.com/MarkRosemaker/openapi"
-	"github.com/MarkRosemaker/openapi-enrich/cassette"
 )
 
 // buildResponse constructs an openapi.Response from an observed HTTP response.

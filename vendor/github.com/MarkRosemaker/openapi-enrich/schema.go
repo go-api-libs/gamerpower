@@ -12,9 +12,9 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/MarkRosemaker/cassette"
 	"github.com/MarkRosemaker/openapi"
 	edit "github.com/MarkRosemaker/openapi-edit"
-	"github.com/MarkRosemaker/openapi-enrich/cassette"
 	merge "github.com/MarkRosemaker/openapi-merge"
 	apitypes "github.com/go-api-libs/types"
 )
