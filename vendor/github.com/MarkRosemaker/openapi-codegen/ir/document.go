@@ -77,7 +77,12 @@ func FromDocument(doc *openapi.Document, packageName, userAgent string, producti
 		return nil, fmt.Errorf("paths: %w", err)
 	}
 
-	hasURL, hasDuration, hasDate, hasDateTimeOrInt, hasUnixTime := needsSpecialImports(schemas, operations)
+	hasURL, hasDuration, hasDate, hasDateTimeOrInt := needsSpecialImports(schemas, operations)
+
+	unixTimes, unixDates, err := markUnix(schemas)
+	if err != nil {
+		return nil, fmt.Errorf("components.schemas: %w", err)
+	}
 
 	globalParams := make(Params, 0, len(globalParamsMap))
 	for _, p := range globalParamsMap.ByIndex() {
@@ -112,7 +117,10 @@ func FromDocument(doc *openapi.Document, packageName, userAgent string, producti
 		HasDurationFields:      hasDuration,
 		HasDateFields:          hasDate,
 		HasDateTimeOrIntFields: hasDateTimeOrInt,
-		HasUnixTimeFields:      hasUnixTime,
+		HasUnixTimeFields:      unixTimes.all,
+		HasUnixDateFields:      unixDates.all,
+		UnixTimeMembers:        unixTimes.members,
+		UnixDateMembers:        unixDates.members,
 		HasServerOverrides: slices.ContainsFunc(operations, func(op Operation) bool {
 			return op.BaseURL != nil
 		}),
@@ -298,9 +306,9 @@ func isInAll(paths openapi.Paths, p *openapi.Parameter) bool {
 	return true
 }
 
-// needsSpecialImports scans schemas and operation types for url.URL, time.Duration, civil.Date,
-// any date-time-or-integer oneOf fields, and any integer-formatted-as-date-time fields.
-func needsSpecialImports(schemas []Schema, ops []Operation) (hasURL, hasDuration, hasDate, hasDateTimeOrInt, hasUnixTime bool) {
+// needsSpecialImports scans schemas and operation types for url.URL, time.Duration, civil.Date, and any
+// date-time-or-integer oneOf fields.
+func needsSpecialImports(schemas []Schema, ops []Operation) (hasURL, hasDuration, hasDate, hasDateTimeOrInt bool) {
 	check := func(goType string) {
 		if containsType(goType, "url.URL") {
 			hasURL = true
@@ -322,10 +330,6 @@ func needsSpecialImports(schemas []Schema, ops []Operation) (hasURL, hasDuration
 			if f.IsDateTimeOrInt {
 				hasDateTimeOrInt = true
 			}
-
-			if f.IsUnixTime {
-				hasUnixTime = true
-			}
 		}
 	}
 
@@ -343,7 +347,7 @@ func needsSpecialImports(schemas []Schema, ops []Operation) (hasURL, hasDuration
 		}
 	}
 
-	return hasURL, hasDuration, hasDate, hasDateTimeOrInt, hasUnixTime
+	return hasURL, hasDuration, hasDate, hasDateTimeOrInt
 }
 
 func containsType(goType, needle string) bool {

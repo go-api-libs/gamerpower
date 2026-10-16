@@ -218,10 +218,10 @@ func (p *Param) setType(s *openapi.Schema) error {
 		p.BaseType = base.String()
 	}
 
-	p.IsUnixTime = p.Type == "time.Time" && deref(s).Type == openapi.TypeInteger
+	p.IsUnix = isUnix(p.Type, deref(s))
 
 	if p.BaseType == "" {
-		p.ParseExpr, p.ParseConv, p.ParseErrFree = parseExpr(p.Type, p.IsUnixTime)
+		p.ParseExpr, p.ParseConv, p.ParseErrFree = parseExpr(p.Type, p.IsUnix)
 		return nil
 	}
 
@@ -353,6 +353,10 @@ func parseExpr(goType string, unixTime bool) (expr, conv string, errFree bool) {
 
 		return "time.Parse(time.RFC3339, %s)", "", false
 	case "civil.Date":
+		if unixTime {
+			return "strconv.ParseInt(%s, 10, 64)", "civil.DateOf(time.Unix(%s, 0).UTC())", false
+		}
+
 		return "civil.ParseDate(%s)", "", false
 	case "net.IP":
 		return "net.ParseIP(%s)", "", true
@@ -519,12 +523,16 @@ func (p Param) FormatExpr() string {
 	case "url.URL":
 		return v + ".String()"
 	case "time.Time":
-		if p.IsUnixTime {
+		if p.IsUnix {
 			return "strconv.Itoa(int(" + v + ".Unix()))"
 		}
 
 		return v + ".Format(time.RFC3339)"
 	case "civil.Date":
+		if p.IsUnix {
+			return "strconv.FormatInt(" + v + ".In(time.UTC).Unix(), 10)"
+		}
+
 		return v + ".String()"
 	case "net.IP":
 		return v + ".String()"

@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/MarkRosemaker/errpath"
 	"github.com/MarkRosemaker/openapi"
@@ -209,6 +210,8 @@ func integerGoType(f openapi.Format) (*GoType, error) {
 		return &GoType{Name: "time.Duration"}, nil
 	case openapi.FormatDateTime:
 		return &GoType{Name: "time.Time"}, nil
+	case openapi.FormatDate:
+		return &GoType{Name: "civil.Date"}, nil
 	default:
 		return nil, fmt.Errorf("unsupported integer format: %q", f)
 	}
@@ -537,8 +540,18 @@ func getField(jsonName string, propRef *openapi.Schema, requiredSet map[string]b
 		ReadOnly:        propRef.ReadOnly || v.ReadOnly,
 		WriteOnly:       propRef.WriteOnly || v.WriteOnly,
 		IsDateTimeOrInt: isDateTimeOrIntegerOneOf(v),
-		IsUnixTime:      goType.Name == "time.Time" && v.Type == openapi.TypeInteger,
+		IsUnix:          isUnix(goType.Name, v),
 	}, nil
+}
+
+// isUnix reports whether a value of the Go type named, from schema s, is an integer of unix time: a date-time or a date
+// that is an integer, or an array of them.
+func isUnix(goType string, s *openapi.Schema) bool {
+	for s != nil && s.Type == openapi.TypeArray { // the items of an array
+		s = deref(s.Items)
+	}
+
+	return (goType == "time.Time" || goType == "civil.Date") && s != nil && s.Type == openapi.TypeInteger
 }
 
 func fromObjectSchema(name string, s *openapi.Schema) (*Schema, error) {
@@ -556,6 +569,13 @@ func fromObjectSchema(name string, s *openapi.Schema) (*Schema, error) {
 
 		fields = append(fields, field)
 	}
+
+	goNames := make([]*string, len(fields))
+	for i := range fields {
+		goNames[i] = &fields[i].Name
+	}
+
+	numberTaken(goNames)
 
 	return &Schema{
 		Name:        name,
@@ -591,6 +611,13 @@ func fromEnumSchema(name string, s *openapi.Schema) (*Schema, error) {
 			Literal: literal,
 		}
 	}
+
+	goNames := make([]*string, len(values))
+	for i := range values {
+		goNames[i] = &values[i].GoName
+	}
+
+	numberTaken(goNames)
 
 	return &Schema{
 		Name:        name,
@@ -754,9 +781,13 @@ func fieldGoName(jsonName string) string {
 		"F#", "CSharp",
 	)
 
-	sanitized := r.Replace(jsonName)
+	sanitized := goWords(r.Replace(jsonName))
 	sanitized = replaceLeadingDigits(sanitized)
-	name := strcase.ToGoPascal(sanitized)
+	name := identOr(strcase.ToGoPascal(sanitized), jsonName)
+
+	if first, _ := utf8.DecodeRuneInString(name); !unicode.IsUpper(first) {
+		name = "X" + name // exported, or encoding leaves it out
+	}
 
 	// "Error" collides with the built-in error interface's Error() string
 	// method (a struct can't have both a field and a method named Error),
@@ -783,21 +814,70 @@ var replInvalidChars = strings.NewReplacer(
 
 // enumConstName builds the Go constant name for an enum value, e.g. MyEnum + "foo_bar" → MyEnumFooBar.
 func enumConstName(typeName, value string) string {
-	sanitized := replInvalidChars.Replace(value)
-	sanitized = strings.Map(func(r rune) rune {
+	sanitized := goWords(replInvalidChars.Replace(value))
+	sanitized = replaceLeadingDigits(sanitized)
+
+	if sanitized != "" && len(sanitized) <= 3 && sanitized == strings.ToUpper(sanitized) && isIdent(sanitized) {
+		return typeName + sanitized
+	}
+
+	return typeName + identOr(strcase.ToGoPascal(sanitized), value)
+}
+
+// goWords is s with any character a Go name cannot hold made a space, which only separates words, e.g. the comma in
+// "Modify, only changes". "-" and "_" stay, as strcase separates words at them too.
+func goWords(s string) string {
+	return strings.Map(func(r rune) rune {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
 			return r
 		}
 
-		return ' ' // any other character only separates words, e.g. the comma in "Modify, only changes"
-	}, sanitized)
-	sanitized = replaceLeadingDigits(sanitized)
+		return ' '
+	}, s)
+}
 
-	if len(sanitized) <= 3 && sanitized == strings.ToUpper(sanitized) {
-		return typeName + sanitized
+// isIdent reports whether s holds only what a Go name can.
+func isIdent(s string) bool {
+	return !strings.ContainsFunc(s, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' })
+}
+
+// identOr is name, made from original, or where nothing of original made it into a name, a name of its own: Empty for
+// an empty original, else its code points, e.g. U002A for "*".
+func identOr(name, original string) string {
+	if name = strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' {
+			return r
+		}
+
+		return -1
+	}, name); name != "" {
+		return name
 	}
 
-	return typeName + strcase.ToGoPascal(sanitized)
+	if original == "" {
+		return "Empty"
+	}
+
+	var b strings.Builder
+	for _, r := range original {
+		fmt.Fprintf(&b, "U%04X", r)
+	}
+
+	return b.String()
+}
+
+// numberTaken makes each of names, in turn, one no other before it has, by numbering a repeat: AB, then AB2.
+func numberTaken(names []*string) {
+	taken := make(map[string]bool, len(names))
+
+	for _, name := range names {
+		base := *name
+		for i := 2; taken[*name]; i++ {
+			*name = base + strconv.Itoa(i)
+		}
+
+		taken[*name] = true
+	}
 }
 
 // replaceLeadingDigits converts every leading digit in the first word to its

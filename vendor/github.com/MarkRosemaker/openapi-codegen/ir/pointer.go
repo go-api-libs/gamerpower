@@ -13,10 +13,10 @@ import (
 // something leaving the field out does not. Only then does a field need a pointer, nil to leave it out and a pointer to
 // the zero value to send it.
 //
-// A string, a time, a slice, a map or a union never needs one: an empty string is no value, and nil or an unset union
+// A string, a time or date, a slice, a map or a union never needs one: an empty string is no value, and nil or an unset union
 // already says nothing is there.
 func zeroIsAValue(s *openapi.Schema, tp *GoType) bool {
-	if tp.IsSlice || tp.IsNilable || tp.IsArrayOfSize > 0 || tp.Name == "any" || tp.Name == "time.Time" ||
+	if tp.IsSlice || tp.IsNilable || tp.IsArrayOfSize > 0 || tp.Name == "any" || tp.Name == "time.Time" || tp.Name == "civil.Date" ||
 		strings.HasPrefix(tp.Name, "map[") {
 		return false
 	}

@@ -17,13 +17,19 @@ import (
 
 var jsonOpts = json.JoinOptions(
 		json.RejectUnknownMembers(true),
-		{{- if or .HasURLFields .HasDurationFields .HasUnixTimeFields }}
+		{{- if or .HasURLFields .HasDurationFields .HasUnixTimeFields .HasUnixDateFields .UnixTimeMembers .UnixDateMembers }}
 		json.WithMarshalers(json.JoinMarshalers(
 			{{- template "marshalers" . }}
 		)),
 		{{- end }}
-		{{- if or .HasURLFields .HasDateTimeOrIntFields .HasDurationFields .HasUnixTimeFields }}
+		{{- if or .HasURLFields .HasDateTimeOrIntFields .HasDurationFields .HasUnixTimeFields .HasUnixDateFields .UnixTimeMembers .UnixDateMembers }}
 		json.WithUnmarshalers(json.JoinUnmarshalers(
+			{{- with .UnixTimeMembers }}
+			json.UnmarshalFromFunc(jsonutil.TimeUnmarshalIntUnixFor({{ range $i, $m := . }}{{ if $i }}, {{ end }}{{ printf "%q" $m }}{{ end }})),
+			{{- end }}
+			{{- with .UnixDateMembers }}
+			json.UnmarshalFromFunc(jsonutil.DateUnmarshalIntUnixFor({{ range $i, $m := . }}{{ if $i }}, {{ end }}{{ printf "%q" $m }}{{ end }})),
+			{{- end }}
 			{{- if .HasURLFields }}
 			json.UnmarshalFromFunc(jsonutil.URLUnmarshal),
 			{{- end }}
@@ -35,6 +41,9 @@ var jsonOpts = json.JoinOptions(
 			{{- end }}
 			{{- if .HasUnixTimeFields }}
 			json.UnmarshalFromFunc(jsonutil.TimeUnmarshalIntUnix),
+			{{- end }}
+			{{- if .HasUnixDateFields }}
+			json.UnmarshalFromFunc(jsonutil.DateUnmarshalIntUnix),
 			{{- end }}
 		)),
 		{{- end }}
@@ -1434,6 +1443,15 @@ func (v *{{.Name}}) unmarshalJSONMember(dec *jsontext.Decoder, name string) (boo
 	{{- end }}
 	{{- if .HasUnixTimeFields }}
 	json.MarshalToFunc(jsonutil.TimeMarshalIntUnix),
+	{{- end }}
+	{{- if .HasUnixDateFields }}
+	json.MarshalToFunc(jsonutil.DateMarshalIntUnix),
+	{{- end }}
+	{{- with .UnixTimeMembers }}
+	json.MarshalToFunc(jsonutil.TimeMarshalIntUnixFor({{ range $i, $m := . }}{{ if $i }}, {{ end }}{{ printf "%q" $m }}{{ end }})),
+	{{- end }}
+	{{- with .UnixDateMembers }}
+	json.MarshalToFunc(jsonutil.DateMarshalIntUnixFor({{ range $i, $m := . }}{{ if $i }}, {{ end }}{{ printf "%q" $m }}{{ end }})),
 	{{- end }}
 {{- end }}
 

@@ -26,7 +26,14 @@ type Document struct {
 	HasDurationFields      bool        `json:"hasDurationFields,omitzero"`
 	HasDateFields          bool        `json:"hasDateFields,omitzero"`
 	HasDateTimeOrIntFields bool        `json:"hasDateTimeOrIntFields,omitzero"`
-	HasUnixTimeFields      bool        `json:"hasUnixTimeFields,omitzero"`
+	// HasUnixTimeFields and HasUnixDateFields are set when every time.Time, or every civil.Date, a JSON body holds is
+	// an integer of unix time, so that a marshaler for the type writes them all.
+	HasUnixTimeFields bool `json:"hasUnixTimeFields,omitzero"`
+	HasUnixDateFields bool `json:"hasUnixDateFields,omitzero"`
+	// UnixTimeMembers and UnixDateMembers are, where some date-times, or dates, are integers of unix time and others
+	// strings, the names of the object members holding the former: a marshaler for the type writes those alone.
+	UnixTimeMembers []string `json:"unixTimeMembers,omitempty"`
+	UnixDateMembers []string `json:"unixDateMembers,omitempty"`
 
 	// HasServerOverrides is true when any path item names a server of its own,
 	// which is what the generated serverURL helper is for.
@@ -370,11 +377,10 @@ type Field struct {
 	// (un)marshaller is required to accept either form on the wire.
 	IsDateTimeOrInt bool `json:"isDateTimeOrInt,omitzero"`
 
-	// IsUnixTime is true when Type is time.Time but the property's schema
-	// itself is an integer (format: date-time), not a date-time string --
-	// see [integerGoType]. A custom (un)marshaller is required to encode and
-	// decode it as a unix timestamp instead of RFC 3339.
-	IsUnixTime bool `json:"isUnixTime,omitzero"`
+	// IsUnix is true when Type is time.Time or civil.Date but the property's schema itself is an integer (format:
+	// date-time or date), see [integerGoType]: it is written and read as unix time, not as a string, see
+	// [Document.HasUnixTimeFields] and [Document.UnixTimeMembers].
+	IsUnix bool `json:"isUnix,omitzero"`
 }
 
 // EnumValue is one member of an enum type.
@@ -431,11 +437,10 @@ type Param struct {
 	// formatting behavior of its own, unlike a builtin: NotZero and
 	// FormatExpr switch on this instead, when set.
 	BaseType string `json:"baseType,omitzero"`
-	// IsUnixTime is true when Type is "time.Time" but the OpenAPI schema
-	// itself is an integer (format: date-time), not a date-time string --
-	// see [integerGoType]. FormatExpr needs this to know whether to encode
-	// the param back into an integer instead of an RFC 3339 string.
-	IsUnixTime  bool   `json:"isUnixTime,omitzero"`
+	// IsUnix is true when Type is "time.Time" or "civil.Date" but the OpenAPI schema itself is an integer (format:
+	// date-time or date), see [integerGoType]. FormatExpr needs this to know whether to encode the param back into an
+	// integer instead of a string.
+	IsUnix      bool   `json:"isUnix,omitzero"`
 	Description string `json:"description,omitzero"`
 	// Item is one element of an array parameter, with v as its variable.
 	Item *Param `json:"item,omitzero"`

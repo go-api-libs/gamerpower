@@ -492,9 +492,9 @@ func goLiteralForType(p ir.Param, value string) string {
 	case "uuid.UUID":
 		return fmt.Sprintf("uuid.MustParse(%q)", value)
 	case "time.Time":
-		// IsUnixTime: FormatExpr encoded the param as v.Unix(), so the
+		// IsUnix: FormatExpr encoded the param as v.Unix(), so the
 		// recorded value is a Unix timestamp, not an RFC 3339 string.
-		if p.IsUnixTime {
+		if p.IsUnix {
 			return fmt.Sprintf("time.Unix(%s, 0)", value)
 		}
 
@@ -502,6 +502,12 @@ func goLiteralForType(p ir.Param, value string) string {
 			return timeLiteral(t)
 		}
 	case "civil.Date":
+		if p.IsUnix {
+			if sec, err := strconv.ParseInt(value, 10, 64); err == nil {
+				value = time.Unix(sec, 0).UTC().Format(time.DateOnly)
+			}
+		}
+
 		if d, err := time.Parse(time.DateOnly, value); err == nil {
 			return fmt.Sprintf("civil.Date{Year: %d, Month: %d, Day: %d}", d.Year(), d.Month(), d.Day())
 		}
@@ -733,6 +739,35 @@ func scalarLiteral(goType string, v any) (string, bool) {
 		}
 
 		return fmt.Sprintf("uuid.MustParse(%q)", s), true
+
+	case "time.Time":
+		switch v := v.(type) {
+		case float64: // an integer of unix time
+			return fmt.Sprintf("time.Unix(%d, 0)", int64(v)), true
+		case string:
+			if t, err := time.Parse(time.RFC3339Nano, v); err == nil {
+				return timeLiteral(t), true
+			}
+		}
+
+		return "", false
+
+	case "civil.Date":
+		var d time.Time
+
+		switch v := v.(type) {
+		case float64: // an integer of unix time
+			d = time.Unix(int64(v), 0).UTC()
+		case string:
+			var err error
+			if d, err = time.Parse(time.DateOnly, v); err != nil {
+				return "", false
+			}
+		default:
+			return "", false
+		}
+
+		return fmt.Sprintf("civil.Date{Year: %d, Month: %d, Day: %d}", d.Year(), d.Month(), d.Day()), true
 
 	default:
 		return "", false
