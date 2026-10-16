@@ -20,6 +20,7 @@ type unixMode struct {
 func markUnix(schemas []Schema) (times, dates unixMode, err error) {
 	for goType, mode := range map[string]*unixMode{"time.Time": &times, "civil.Date": &dates} {
 		unix, other := map[string]bool{}, map[string]bool{}
+		unixPosition := "" // a tuple's field, which no member name reaches
 
 		for _, s := range schemas {
 			for _, f := range s.Fields {
@@ -27,6 +28,8 @@ func markUnix(schemas []Schema) (times, dates unixMode, err error) {
 				case f.Embedded || !containsType(f.Type, goType):
 				case f.IsDateTimeOrInt:
 					// either form will do: it is written as the others are, or as a string where they differ
+				case f.IsUnix && s.Kind == SchemaKindTuple:
+					unixPosition = s.Name + "." + f.Name
 				case f.IsUnix:
 					if strings.Contains(f.Type, "map[") {
 						return unixMode{}, unixMode{}, fmt.Errorf("%s.%s: a map of integer %s is not supported", s.Name, f.Name, goType)
@@ -40,9 +43,11 @@ func markUnix(schemas []Schema) (times, dates unixMode, err error) {
 		}
 
 		switch {
-		case len(unix) == 0:
+		case len(unix) == 0 && unixPosition == "":
 		case len(other) == 0:
 			mode.all = true
+		case unixPosition != "":
+			return unixMode{}, unixMode{}, fmt.Errorf("%s: an integer %s among strings is not supported in a tuple, which has no member names", unixPosition, goType)
 		default:
 			for name := range unix {
 				switch {

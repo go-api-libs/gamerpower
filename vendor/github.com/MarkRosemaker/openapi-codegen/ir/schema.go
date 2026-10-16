@@ -727,6 +727,7 @@ func fromTupleSchema(name string, s *openapi.Schema) (*Schema, error) {
 			Name:        fieldName,
 			Type:        tp.String(),
 			Description: cmp.Or(p.Description, deref(p).Description),
+			IsUnix:      isUnix(tp.Name, deref(p)),
 		}
 	}
 
