@@ -10,7 +10,7 @@ tool (
 )
 
 require (
-	github.com/MarkRosemaker/cassette v0.0.0-20261011100210-a2f8d6b55f5a
+	github.com/MarkRosemaker/cassette v0.0.0-20261016040141-470096571ee8
 	github.com/MarkRosemaker/jsonutil v0.0.0-20261015233346-026192cb8989
 	github.com/go-api-libs/api v0.0.0-20261011100139-4690447dcdfa
 )
@@ -19,14 +19,14 @@ require (
 	cloud.google.com/go v0.123.0 // indirect
 	github.com/MarkRosemaker/errpath v0.0.0-20261011100139-0f973ba10436 // indirect
 	github.com/MarkRosemaker/json2yaml v0.0.0-20261011100139-2d7c8ec80f68 // indirect
-	github.com/MarkRosemaker/openapi v0.0.0-20261014160147-b50e9a6647e8 // indirect
-	github.com/MarkRosemaker/openapi-codegen v0.0.0-20261014160454-496fafa6bc21 // indirect
-	github.com/MarkRosemaker/openapi-compare v0.0.0-20261014160217-9b0c0d498af5 // indirect
-	github.com/MarkRosemaker/openapi-compress v0.0.0-20261014160329-b3e2008841e6 // indirect
-	github.com/MarkRosemaker/openapi-edit v0.0.0-20261014160218-58909fa94031 // indirect
-	github.com/MarkRosemaker/openapi-enrich v0.0.0-20261014160258-bf4dc5753a81 // indirect
-	github.com/MarkRosemaker/openapi-flatten v0.0.0-20261014160218-57e111049276 // indirect
-	github.com/MarkRosemaker/openapi-merge v0.0.0-20261014160217-b26107050c57 // indirect
+	github.com/MarkRosemaker/openapi v0.0.0-20261016040148-ee917e6f18e9 // indirect
+	github.com/MarkRosemaker/openapi-codegen v0.0.0-20261016040551-bbd68ca63d81 // indirect
+	github.com/MarkRosemaker/openapi-compare v0.0.0-20261016040229-cf60cd6c6fe8 // indirect
+	github.com/MarkRosemaker/openapi-compress v0.0.0-20261016040406-a058028d3df7 // indirect
+	github.com/MarkRosemaker/openapi-edit v0.0.0-20261016040231-29f295d132ee // indirect
+	github.com/MarkRosemaker/openapi-enrich v0.0.0-20261016040335-af601c02c218 // indirect
+	github.com/MarkRosemaker/openapi-flatten v0.0.0-20261016040232-86da375927a3 // indirect
+	github.com/MarkRosemaker/openapi-merge v0.0.0-20261016040230-9b5496dc735a // indirect
 	github.com/MarkRosemaker/ordmap v0.0.0-20261014160122-d6113d0a91f7 // indirect
 	github.com/MarkRosemaker/yaml v0.0.0-20261011100206-7a238ac9deda // indirect
 	github.com/MarkRosemaker/yaml2json v0.0.0-20261011100139-1181ffd29042 // indirect
