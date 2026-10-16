@@ -33,7 +33,7 @@ github.com/MarkRosemaker/openapi-compress/cmd/openapi-compress
 # github.com/MarkRosemaker/openapi-edit v0.0.0-20261016110508-11b2181bb064
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-edit
-# github.com/MarkRosemaker/openapi-enrich v0.0.0-20261016145552-532b873a40bb
+# github.com/MarkRosemaker/openapi-enrich v0.0.0-20261016160155-debbe6863531
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-enrich
 github.com/MarkRosemaker/openapi-enrich/cmd/openapi-enrich
