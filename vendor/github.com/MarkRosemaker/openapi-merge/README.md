@@ -59,6 +59,10 @@ particular ways that sample-derived schemas disagree:
   `oneOf`, and later samples go to the alternative of their own shape, or add one.
 - **Numeric widening** — an integer in one sample and a floating-point number in
   another merge to a number.
+- **Integer formats** — an integer without a format, as every sample is, keeps
+  the other side's: a declared `int64` stays. Of `int32` and `int64` the wider
+  stays, and an example that does not fit 32 bits makes an `int32` an `int64`
+  (`uint32` and `uint64` alike).
 - **Dates in two encodings** — a value seen as a date-time string in one sample and
   as a Unix timestamp integer in another becomes a `oneOf` of the two, rather than
   one silently discarding the other.

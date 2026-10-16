@@ -2,12 +2,14 @@ package merge
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/MarkRosemaker/errpath"
@@ -265,6 +267,44 @@ func reconcileTypeMismatch(a, b *openapi.Schema, tp openapi.DataType, isParam bo
 	}
 }
 
+// widenIntegerFormat gives integers a and b the wider of their formats, int64 over int32 and uint64 over uint32, and a
+// 64-bit one where an example does not fit 32 bits.
+func widenIntegerFormat(a, b *openapi.Schema) {
+	for _, s := range []*openapi.Schema{a, b} {
+		var w openapi.Format
+
+		switch s.Format { //nolint:exhaustive // only 32-bit formats widen
+		case openapi.FormatInt32:
+			w = openapi.FormatInt64
+		case openapi.FormatUint32:
+			w = openapi.FormatUint64
+		default:
+			continue
+		}
+
+		if a.Format == w || b.Format == w || !fits32(a.Example, s.Format) || !fits32(b.Example, s.Format) {
+			a.Format, b.Format = w, w
+			return
+		}
+	}
+}
+
+// fits32 reports whether the integer example v, if any, fits the 32-bit format f.
+func fits32(v jsontext.Value, f openapi.Format) bool {
+	if len(v) == 0 {
+		return true
+	}
+
+	if f == openapi.FormatUint32 {
+		_, err := strconv.ParseUint(string(v), 10, 32)
+		return err == nil
+	}
+
+	_, err := strconv.ParseInt(string(v), 10, 32)
+
+	return err == nil
+}
+
 // reconcileFormats resolves a and b's formats when either is unset, and
 // reports a mismatch it could not resolve.
 func reconcileFormats(a, b *openapi.Schema) error {
@@ -272,17 +312,9 @@ func reconcileFormats(a, b *openapi.Schema) error {
 	if a.Format == "" || b.Format == "" {
 		switch a.Type {
 		case openapi.TypeInteger:
-			// Except if one is a date or datetime, then we can transform the integer
-			if a.Format == openapi.FormatDate || a.Format == openapi.FormatDateTime ||
-				a.Format == openapi.FormatDuration {
-				b.Format = a.Format
-			} else if b.Format == openapi.FormatDate || b.Format == openapi.FormatDateTime ||
-				b.Format == openapi.FormatDuration {
-				a.Format = b.Format
-			} else {
-				a.Format = ""
-				b.Format = ""
-			}
+			// an integer without a format is one of any width: the other's format stays, wide enough for both below
+			f := cmp.Or(a.Format, b.Format)
+			a.Format, b.Format = f, f
 		case openapi.TypeNumber:
 			if a.Format != "" {
 				b.Format = a.Format
@@ -297,6 +329,10 @@ func reconcileFormats(a, b *openapi.Schema) error {
 			a.Format = ""
 			b.Format = ""
 		}
+	}
+
+	if a.Type == openapi.TypeInteger {
+		widenIntegerFormat(a, b)
 	}
 
 	// check that the formats are the same
