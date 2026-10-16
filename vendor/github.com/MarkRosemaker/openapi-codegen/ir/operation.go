@@ -260,6 +260,15 @@ func fromParam(p *openapi.Parameter, apiTitle string) (Param, error) {
 
 		param.Item = item
 		param.Type = "[]" + item.Type
+
+		if schema.Ref != nil { // a named array, such as Modules, keeps its name
+			tp, err := SchemaGoType(schema)
+			if err != nil {
+				return param, err
+			}
+
+			param.Type = tp.String()
+		}
 	case d.Type == openapi.TypeObject && p.In == openapi.ParameterLocationQuery:
 		if err := param.setObject(schema); err != nil {
 			return param, err
