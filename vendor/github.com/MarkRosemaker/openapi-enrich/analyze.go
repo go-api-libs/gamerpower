@@ -348,7 +348,7 @@ func processResponse(op *openapi.Operation, resp *cassette.Response) error {
 	sc := openapi.StatusCode(strconv.Itoa(resp.StatusCode))
 
 	if op.Responses == nil {
-		op.Responses = openapi.OperationResponses{}
+		op.Responses = openapi.OperationResponses{} //nolint:exhaustive
 	}
 
 	existing, ok := op.Responses[sc]

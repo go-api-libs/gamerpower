@@ -49,13 +49,8 @@ func decodeSchema(dec *jsontext.Decoder) (*openapi.Schema, error) {
 
 	case '0': // number
 		str := v.String()
-		if i, err := strconv.ParseInt(str, 10, 64); err == nil {
-			s := &openapi.Schema{Type: openapi.TypeInteger, Example: jsontext.Value(str)}
-			if i != int64(int32(i)) {
-				s.Format = openapi.FormatInt64 // it does not fit 32 bits
-			}
-
-			return s, nil
+		if _, err := strconv.ParseInt(str, 10, 64); err == nil {
+			return &openapi.Schema{Type: openapi.TypeInteger, Example: jsontext.Value(str)}, nil
 		}
 
 		return &openapi.Schema{Type: openapi.TypeNumber, Format: openapi.FormatDouble, Example: jsontext.Value(str)}, nil
