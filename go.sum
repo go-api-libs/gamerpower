@@ -6,8 +6,8 @@ github.com/MarkRosemaker/errpath v0.0.0-20261016110315-f418d8a9c89d h1:m3mqYMoAP
 github.com/MarkRosemaker/errpath v0.0.0-20261016110315-f418d8a9c89d/go.mod h1:VnXpUlsS3n1gSToedcQl2FCARGoA16CyitbCanUIv+I=
 github.com/MarkRosemaker/json2yaml v0.0.0-20261016110315-5aef3717d3ec h1:5hrbP2LG5Rs+6IAWYty5q19gyIgWhYSp69mu/NwhqMY=
 github.com/MarkRosemaker/json2yaml v0.0.0-20261016110315-5aef3717d3ec/go.mod h1:eUwIjjooIESK1Ymw4bbMdSDF6feAblyZjxyoo5o/W6U=
-github.com/MarkRosemaker/jsonutil v0.0.0-20261017150224-41ecb78a5a01 h1:VHpF43jcVEdXWYcblp8UpW5psfI2hRiDPCyq67jf0Yc=
-github.com/MarkRosemaker/jsonutil v0.0.0-20261017150224-41ecb78a5a01/go.mod h1:SzjJlgYFlzpbFGvUUoQgfEsWlbai63bvhDPK8J0MNYM=
+github.com/MarkRosemaker/jsonutil v0.0.0-20261017153733-fa5402164d3f h1:N4pEgO6FfNMOq0ageKsRJuZp7jqZ7McViSexTDfhNbk=
+github.com/MarkRosemaker/jsonutil v0.0.0-20261017153733-fa5402164d3f/go.mod h1:SzjJlgYFlzpbFGvUUoQgfEsWlbai63bvhDPK8J0MNYM=
 github.com/MarkRosemaker/openapi v0.0.0-20261017150252-4bbc7369ca87 h1:6/Q9lg1Q33v98E0I2QkgZhbIvgNRskaXYte0oH9Wj/E=
 github.com/MarkRosemaker/openapi v0.0.0-20261017150252-4bbc7369ca87/go.mod h1:mHdBCo47bX7snoJURLb7MEBtlHCG4JmTblY/1g4LXE8=
 github.com/MarkRosemaker/openapi-codegen v0.0.0-20261017150647-8e27791a377e h1:1eUR5y79zLWb6HEoW5V7+s1d+4VdVNEH7j+7xPkFRX4=
