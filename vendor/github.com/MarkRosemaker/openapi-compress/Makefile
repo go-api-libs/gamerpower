@@ -38,7 +38,7 @@ build:
 
 # ARGS passes flags through, e.g. `make run ARGS=-debug`.
 run: build
-	$(BINARY) $(ARGS)
+	$(BINARY) $(ARGS) | loggo stream
 
 lint:
 	golangci-lint run

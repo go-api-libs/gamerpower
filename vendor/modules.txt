@@ -16,7 +16,7 @@ github.com/MarkRosemaker/jsonutil
 # github.com/MarkRosemaker/openapi v0.0.0-20261016110439-f1eb3bd9dfcb
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi
-# github.com/MarkRosemaker/openapi-codegen v0.0.0-20261016214151-051710b4d7dd
+# github.com/MarkRosemaker/openapi-codegen v0.0.0-20261017121456-c1da0324ac33
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-codegen
 github.com/MarkRosemaker/openapi-codegen/cmd/openapi-codegen
@@ -26,18 +26,18 @@ github.com/MarkRosemaker/openapi-codegen/render
 # github.com/MarkRosemaker/openapi-compare v0.0.0-20261016110507-bf6c28c1362b
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-compare/schema
-# github.com/MarkRosemaker/openapi-compress v0.0.0-20261016110626-9de772e17284
+# github.com/MarkRosemaker/openapi-compress v0.0.0-20261017121345-a5cd0179b5d4
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-compress
 github.com/MarkRosemaker/openapi-compress/cmd/openapi-compress
 # github.com/MarkRosemaker/openapi-edit v0.0.0-20261016110508-11b2181bb064
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-edit
-# github.com/MarkRosemaker/openapi-enrich v0.0.0-20261016160155-debbe6863531
+# github.com/MarkRosemaker/openapi-enrich v0.0.0-20261017121335-1131d2dfb9bc
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-enrich
 github.com/MarkRosemaker/openapi-enrich/cmd/openapi-enrich
-# github.com/MarkRosemaker/openapi-flatten v0.0.0-20261016110507-1d5558fcf53b
+# github.com/MarkRosemaker/openapi-flatten v0.0.0-20261017121323-d01c2dfb2137
 ## explicit; go 1.27
 github.com/MarkRosemaker/openapi-flatten
 github.com/MarkRosemaker/openapi-flatten/cmd/openapi-flatten
