@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MarkRosemaker/errpath"
 	"github.com/MarkRosemaker/openapi"
@@ -311,6 +312,22 @@ func fits32(v jsontext.Value, f openapi.Format) bool {
 	return err == nil
 }
 
+// fitsDateBasic reports whether the string example v, if any, is a date in ISO 8601's basic form, such as "20260320".
+func fitsDateBasic(v jsontext.Value) bool {
+	if len(v) == 0 {
+		return true
+	}
+
+	var str string
+	if json.Unmarshal(v, &str) != nil {
+		return false
+	}
+
+	_, err := time.Parse("20060102", str)
+
+	return err == nil
+}
+
 // reconcileFormats resolves a and b's formats when either is unset, and
 // reports a mismatch it could not resolve.
 func reconcileFormats(a, b *openapi.Schema) error {
@@ -330,6 +347,14 @@ func reconcileFormats(a, b *openapi.Schema) error {
 				// If no indication given, default to double
 				a.Format = openapi.FormatDouble
 				b.Format = openapi.FormatDouble
+			}
+		case openapi.TypeString:
+			// date-basic, which no sample is recorded with, stays where the value without a format fits it
+			switch f := cmp.Or(a.Format, b.Format); {
+			case f == openapi.FormatDateBasic && fitsDateBasic(a.Example) && fitsDateBasic(b.Example):
+				a.Format, b.Format = f, f
+			default:
+				a.Format, b.Format = "", ""
 			}
 		default:
 			a.Format = ""
