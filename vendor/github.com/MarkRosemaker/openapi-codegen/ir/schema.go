@@ -37,6 +37,10 @@ func SchemaGoType(s *openapi.Schema) (*GoType, error) {
 			return &GoType{Name: "time.Time"}, nil
 		}
 
+		if s.Ref.Value != nil && isStringOrNumberOneOf(s.Ref.Value) {
+			return &GoType{Name: "float64"}, nil
+		}
+
 		// "X or null" gets no type of its own either: it is a pointer to X.
 		if v := nullableVariant(s.Ref.Value); v != nil {
 			return nullableGoType(v)
@@ -74,6 +78,10 @@ func SchemaGoType(s *openapi.Schema) (*GoType, error) {
 	case "":
 		if isDateTimeOrIntegerOneOf(s) {
 			return &GoType{Name: "time.Time"}, nil
+		}
+
+		if isStringOrNumberOneOf(s) {
+			return &GoType{Name: "float64"}, nil
 		}
 
 		if v := nullableVariant(s); v != nil {
@@ -127,6 +135,36 @@ func isDateTimeOrIntegerOneOf(s *openapi.Schema) bool {
 	}
 
 	return hasDateTime && hasInteger
+}
+
+// isStringOrNumberOneOf reports whether s is a oneOf of exactly two schemas, a string of no format and a number or an
+// integer: a number an API sends as a string, such as "9.5", and now and then as a number. It is a float64, read from
+// either and written as a string.
+func isStringOrNumberOneOf(s *openapi.Schema) bool {
+	if len(s.OneOf) != 2 {
+		return false
+	}
+
+	var hasString, hasNumber bool
+
+	for _, entry := range s.OneOf {
+		switch v := deref(entry); {
+		case v == nil:
+			return false
+		case v.Type == openapi.TypeString && v.Format == "" && len(v.Enum) == 0 && len(v.Const) == 0:
+			hasString = true
+		case v.Type == openapi.TypeNumber, v.Type == openapi.TypeInteger:
+			hasNumber = true
+		}
+	}
+
+	return hasString && hasNumber
+}
+
+// collapsesOneOf reports whether s is a oneOf that is one Go type of its own, not a union: a date-time or an integer,
+// or a string or a number.
+func collapsesOneOf(s *openapi.Schema) bool {
+	return isDateTimeOrIntegerOneOf(s) || isStringOrNumberOneOf(s)
 }
 
 // isAnyOfOnly reports whether s is an untagged union expressed purely via
@@ -189,7 +227,7 @@ func nullableGoType(v *openapi.Schema) (*GoType, error) {
 // date-time-or-integer pattern that collapses to time.Time.
 func isOneOfOnly(s *openapi.Schema) bool {
 	return s.Type == "" && len(s.OneOf) > 0 && len(s.AllOf) == 0 && len(s.AnyOf) == 0 &&
-		!isDateTimeOrIntegerOneOf(s)
+		!collapsesOneOf(s)
 }
 
 func integerGoType(f openapi.Format) (*GoType, error) {
@@ -380,8 +418,8 @@ func fromSchema(name string, s *openapi.Schema, uses map[string]int, folded map[
 
 		return fromArraySchema(name, s)
 	case "":
-		if isDateTimeOrIntegerOneOf(s) {
-			return nil, nil // handled specially: SchemaGoType resolves the $ref straight to time.Time
+		if collapsesOneOf(s) {
+			return nil, nil // handled specially: SchemaGoType resolves the $ref straight to time.Time or float64
 		}
 
 		if nullableVariant(s) != nil {
@@ -530,17 +568,23 @@ func getField(jsonName string, propRef *openapi.Schema, requiredSet map[string]b
 		fieldName = override
 	}
 
+	tag := buildJSONTag(jsonName, required)
+	if isStringOrNumberOneOf(v) {
+		tag = strings.TrimSuffix(tag, `"`) + `,string"` // written as the string it mostly is
+	}
+
 	return Field{
-		Name:            fieldName,
-		JSONName:        jsonName,
-		Type:            goType.String(),
-		JSONTag:         buildJSONTag(jsonName, required),
-		Description:     cmp.Or(propRef.Description, v.Description),
-		Required:        required,
-		ReadOnly:        propRef.ReadOnly || v.ReadOnly,
-		WriteOnly:       propRef.WriteOnly || v.WriteOnly,
-		IsDateTimeOrInt: isDateTimeOrIntegerOneOf(v),
-		IsUnix:          isUnix(goType.Name, v),
+		Name:             fieldName,
+		JSONName:         jsonName,
+		Type:             goType.String(),
+		JSONTag:          tag,
+		Description:      cmp.Or(propRef.Description, v.Description),
+		Required:         required,
+		ReadOnly:         propRef.ReadOnly || v.ReadOnly,
+		WriteOnly:        propRef.WriteOnly || v.WriteOnly,
+		IsDateTimeOrInt:  isDateTimeOrIntegerOneOf(v),
+		IsStringOrNumber: isStringOrNumberOneOf(v),
+		IsUnix:           isUnix(goType.Name, v),
 	}, nil
 }
 

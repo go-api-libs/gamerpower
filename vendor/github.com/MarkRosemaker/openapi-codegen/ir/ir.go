@@ -12,20 +12,21 @@ import (
 // Document is the top-level IR type passed to templates.
 type Document struct {
 	// If enabled, debug mode will record responses that failed to unmarshal.
-	Debug                  bool        `json:"debug,omitzero"`
-	Title                  string      `json:"title,omitzero"`
-	Production             bool        `json:"production,omitzero"`
-	PackageName            string      `json:"packageName,omitzero"`
-	BaseURL                URLParts    `json:"baseURL,omitzero"`
-	UserAgent              string      `json:"userAgent,omitzero"`
-	Operations             []Operation `json:"operations,omitempty"`
-	GlobalParams           Params      `json:"globalParams,omitempty"`
-	Schemas                []Schema    `json:"schemas,omitempty"`
-	Auth                   Auth        `json:"security,omitzero"`
-	HasURLFields           bool        `json:"hasURLFields,omitzero"`
-	HasDurationFields      bool        `json:"hasDurationFields,omitzero"`
-	HasDateFields          bool        `json:"hasDateFields,omitzero"`
-	HasDateTimeOrIntFields bool        `json:"hasDateTimeOrIntFields,omitzero"`
+	Debug                   bool        `json:"debug,omitzero"`
+	Title                   string      `json:"title,omitzero"`
+	Production              bool        `json:"production,omitzero"`
+	PackageName             string      `json:"packageName,omitzero"`
+	BaseURL                 URLParts    `json:"baseURL,omitzero"`
+	UserAgent               string      `json:"userAgent,omitzero"`
+	Operations              []Operation `json:"operations,omitempty"`
+	GlobalParams            Params      `json:"globalParams,omitempty"`
+	Schemas                 []Schema    `json:"schemas,omitempty"`
+	Auth                    Auth        `json:"security,omitzero"`
+	HasURLFields            bool        `json:"hasURLFields,omitzero"`
+	HasDurationFields       bool        `json:"hasDurationFields,omitzero"`
+	HasDateFields           bool        `json:"hasDateFields,omitzero"`
+	HasDateTimeOrIntFields  bool        `json:"hasDateTimeOrIntFields,omitzero"`
+	HasStringOrNumberFields bool        `json:"hasStringOrNumberFields,omitzero"`
 	// HasUnixTimeFields and HasUnixDateFields are set when every time.Time, or every civil.Date, a JSON body holds is
 	// an integer of unix time, so that a marshaler for the type writes them all.
 	HasUnixTimeFields bool `json:"hasUnixTimeFields,omitzero"`
@@ -376,6 +377,10 @@ type Field struct {
 	// date-time string and an integer. The Go type is time.Time, but a custom
 	// (un)marshaller is required to accept either form on the wire.
 	IsDateTimeOrInt bool `json:"isDateTimeOrInt,omitzero"`
+
+	// IsStringOrNumber is true when the property's schema is a oneOf of a string and a number: a float64, read from
+	// either with jsonutil.Float64UnmarshalStringOrNumber and written as a string, through its tag's string option.
+	IsStringOrNumber bool `json:"isStringOrNumber,omitzero"`
 
 	// IsUnix is true when Type is time.Time or civil.Date but the property's schema itself is an integer (format:
 	// date-time or date), see [integerGoType]: it is written and read as unix time, not as a string, see

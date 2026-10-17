@@ -172,6 +172,10 @@ How the specification maps onto Go:
   in another fails generation, since its name cannot tell them apart. A oneOf of
   a date-time and an integer reads either and is written as the others are, or
   as a string where they mix.
+- **Numbers sent as strings** — a oneOf of a string and a number, as an API that
+  sends `"9.5"` and now and then `0.0` has, is a `float64`: read from either with
+  jsonutil's `Float64UnmarshalStringOrNumber`, and written as the string, through
+  its tag's `string` option.
 - **Authentication** — each operation sends the credential its own `security`
   names, else the document's: a bearer token or basic auth, read from the
   environment. Where a document uses both, `NewClient` requires at least one, and

@@ -117,10 +117,13 @@ func FromDocument(doc *openapi.Document, packageName, userAgent string, producti
 		HasDurationFields:      hasDuration,
 		HasDateFields:          hasDate,
 		HasDateTimeOrIntFields: hasDateTimeOrInt,
-		HasUnixTimeFields:      unixTimes.all,
-		HasUnixDateFields:      unixDates.all,
-		UnixTimeMembers:        unixTimes.members,
-		UnixDateMembers:        unixDates.members,
+		HasStringOrNumberFields: slices.ContainsFunc(schemas, func(s Schema) bool {
+			return slices.ContainsFunc(s.Fields, func(f Field) bool { return f.IsStringOrNumber })
+		}),
+		HasUnixTimeFields: unixTimes.all,
+		HasUnixDateFields: unixDates.all,
+		UnixTimeMembers:   unixTimes.members,
+		UnixDateMembers:   unixDates.members,
 		HasServerOverrides: slices.ContainsFunc(operations, func(op Operation) bool {
 			return op.BaseURL != nil
 		}),

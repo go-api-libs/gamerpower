@@ -13,7 +13,7 @@
 		"swagger"
 	],
 	"coverage": 75.4,
-	"devtoolVersion": "v0.0.0-20261017104253-b495cfe678eb",
+	"devtoolVersion": "v0.0.0-20261017132620-b1e2f2c2fa46",
 	"kind": "cli",
 	"tools": {
 		"golangci-lint": "v2.15.0",

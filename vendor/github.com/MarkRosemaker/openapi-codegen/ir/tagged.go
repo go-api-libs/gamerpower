@@ -122,7 +122,7 @@ type taggedShape struct {
 func unionLeaves(alts openapi.SchemaList, parent *openapi.Schema, depth int) (leaves, parents openapi.SchemaList) {
 	for _, a := range alts {
 		if d := deref(a); depth < 8 && d != nil && d.Type == "" && (len(d.OneOf) > 0 || len(d.AnyOf) > 0) &&
-			!isDateTimeOrIntegerOneOf(d) && nullableVariant(d) == nil {
+			!collapsesOneOf(d) && nullableVariant(d) == nil {
 			l, p := unionLeaves(alternatives(d), a, depth+1)
 			leaves, parents = append(leaves, l...), append(parents, p...)
 

@@ -726,6 +726,13 @@ func scalarLiteral(goType string, v any) (string, bool) {
 
 	case "float32", "float64":
 		f, ok := v.(float64)
+		if str, isStr := v.(string); isStr { // a number sent as a string, see ir.Field.IsStringOrNumber
+			var err error
+
+			f, err = strconv.ParseFloat(str, 64)
+			ok = err == nil
+		}
+
 		if !ok {
 			return "", false
 		}

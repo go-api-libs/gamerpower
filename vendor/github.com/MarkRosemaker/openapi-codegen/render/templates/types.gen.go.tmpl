@@ -22,7 +22,7 @@ var jsonOpts = json.JoinOptions(
 			{{- template "marshalers" . }}
 		)),
 		{{- end }}
-		{{- if or .HasURLFields .HasDateTimeOrIntFields .HasDurationFields .HasUnixTimeFields .HasUnixDateFields .UnixTimeMembers .UnixDateMembers }}
+		{{- if or .HasURLFields .HasDateTimeOrIntFields .HasStringOrNumberFields .HasDurationFields .HasUnixTimeFields .HasUnixDateFields .UnixTimeMembers .UnixDateMembers }}
 		json.WithUnmarshalers(json.JoinUnmarshalers(
 			{{- with .UnixTimeMembers }}
 			json.UnmarshalFromFunc(jsonutil.TimeUnmarshalIntUnixFor({{ range $i, $m := . }}{{ if $i }}, {{ end }}{{ printf "%q" $m }}{{ end }})),
@@ -32,6 +32,9 @@ var jsonOpts = json.JoinOptions(
 			{{- end }}
 			{{- if .HasURLFields }}
 			json.UnmarshalFromFunc(jsonutil.URLUnmarshal),
+			{{- end }}
+			{{- if .HasStringOrNumberFields }}
+			json.UnmarshalFromFunc(jsonutil.Float64UnmarshalStringOrNumber),
 			{{- end }}
 			{{- if .HasDateTimeOrIntFields }}
 			json.UnmarshalFromFunc(jsonutil.TimeUnmarshalStringOrIntUnix),

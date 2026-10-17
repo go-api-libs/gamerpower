@@ -159,7 +159,7 @@ func hasJSONMethods(s *openapi.Schema) bool {
 	s = deref(s)
 
 	switch {
-	case s == nil, isDateTimeOrIntegerOneOf(s), nullableVariant(s) != nil:
+	case s == nil, collapsesOneOf(s), nullableVariant(s) != nil:
 		return false
 	case len(s.PrefixItems) > 0, s.Type == "" && (len(s.OneOf) > 0 || len(s.AnyOf) > 0):
 		return true
@@ -221,7 +221,7 @@ func isUnion(s *openapi.Schema) bool {
 	s = deref(s)
 
 	return s != nil && s.Type == "" && (len(s.OneOf) > 0 || len(s.AnyOf) > 0) &&
-		!isDateTimeOrIntegerOneOf(s) && nullableVariant(s) == nil && !isTaggedUnion(s)
+		!collapsesOneOf(s) && nullableVariant(s) == nil && !isTaggedUnion(s)
 }
 
 // alternatives returns the alternatives of the union s.
