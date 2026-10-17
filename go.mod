@@ -20,7 +20,7 @@ require (
 	github.com/MarkRosemaker/errpath v0.0.0-20261016110315-f418d8a9c89d // indirect
 	github.com/MarkRosemaker/json2yaml v0.0.0-20261016110315-5aef3717d3ec // indirect
 	github.com/MarkRosemaker/openapi v0.0.0-20261017163235-cd74c9692141 // indirect
-	github.com/MarkRosemaker/openapi-codegen v0.0.0-20261017163520-1d2306f24af6 // indirect
+	github.com/MarkRosemaker/openapi-codegen v0.0.0-20261017220342-0dee9a0f9160 // indirect
 	github.com/MarkRosemaker/openapi-compare v0.0.0-20261017163259-063f8be93e7f // indirect
 	github.com/MarkRosemaker/openapi-compress v0.0.0-20261017163356-8c777abdde87 // indirect
 	github.com/MarkRosemaker/openapi-edit v0.0.0-20261017163259-f6cc0d8b17cb // indirect
