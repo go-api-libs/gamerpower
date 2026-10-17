@@ -66,6 +66,11 @@ particular ways that sample-derived schemas disagree:
 - **Dates in two encodings** — a value seen as a date-time string in one sample and
   as a Unix timestamp integer in another becomes a `oneOf` of the two, rather than
   one silently discarding the other.
+- **Numbers sent as strings** — a value seen as a numeric string, such as
+  `"9.5"`, in one sample and as a number, such as `0.0`, in another becomes a
+  `oneOf` of a string and a number; an integer's alternative is a number, as the
+  strings may hold fractions. A number beside a string that holds words, such as
+  `"foo"`, says no more than null, and the string stays.
 - **Dates with and without a time** — a value seen as a `date` in one sample and
   as a `date-time` in another, as Notion's date `start` is, becomes a `oneOf` of
   the two.

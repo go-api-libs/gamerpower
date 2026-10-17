@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -239,6 +240,11 @@ func reconcileTypeMismatch(a, b *openapi.Schema, tp openapi.DataType, isParam bo
 		}
 
 		return false, nil
+	case tp == openapi.TypeString && (b.Type == openapi.TypeNumber || b.Type == openapi.TypeInteger) && isNumericString(a),
+		tp == openapi.TypeNumber && b.Type == openapi.TypeString && isNumericString(b):
+		// an API that sends numbers as strings, such as "9.5", and now and then a number, such as 0.0
+		mergeStringOrNumber(a, b)
+		return true, nil
 	case tp == openapi.TypeNumber && b.Type == openapi.TypeString && isInfinityExample(bJSON),
 		b.Type == openapi.TypeNumber && tp == openapi.TypeString && isZeroDoubleExample(bJSON):
 		b.Replace(a)
@@ -1230,6 +1236,44 @@ func mergeDateTimeOrTimestamp(a, b *openapi.Schema) {
 			&strCopy,
 			&intCopy,
 		},
+	}
+
+	a.Replace(&merged)
+	b.Replace(&merged)
+}
+
+// isNumericString reports whether the string schema s holds numbers, as its example says: "9.5", say, not "foo".
+func isNumericString(s *openapi.Schema) bool {
+	var v string
+	if json.Unmarshal(s.Example, &v) != nil {
+		return false
+	}
+
+	f, err := strconv.ParseFloat(v, 64)
+
+	return err == nil && !math.IsInf(f, 0) && !math.IsNaN(f) // "Infinity" is an overflow, see [isInfinityExample]
+}
+
+// mergeStringOrNumber makes a and b a oneOf of a string and a number, the string first, each with its own example: a
+// number sent as a string sometimes and as a number other times. An integer's alternative is a number, as the strings
+// may hold fractions.
+func mergeStringOrNumber(a, b *openapi.Schema) {
+	str, num := *a, *b
+	if a.Type != openapi.TypeString {
+		str, num = *b, *a
+	}
+
+	str.Title, str.Description = "", ""
+	num.Title, num.Description = "", ""
+
+	if num.Type == openapi.TypeInteger {
+		num.Type, num.Format = openapi.TypeNumber, openapi.FormatDouble
+	}
+
+	merged := openapi.Schema{
+		Title:       a.Title,
+		Description: a.Description,
+		OneOf:       openapi.SchemaList{&str, &num},
 	}
 
 	a.Replace(&merged)
