@@ -172,6 +172,11 @@ How the specification maps onto Go:
   in another fails generation, since its name cannot tell them apart. A oneOf of
   a date-time and an integer reads either and is written as the others are, or
   as a string where they mix.
+- **Dates in ISO 8601's basic form** — a string of format `date-basic`, such as
+  `"20260320"`, is a `civil.Date`, written and read without separators: by one
+  marshaler where every date is in that form, else by the names of the members
+  holding them, as for Unix times, through jsonutil's `DateMarshalBasic` and the
+  like. A query parameter of the format is sent and read the same way.
 - **Numbers sent as strings** — a oneOf of a string and a number, as an API that
   sends `"9.5"` and now and then `0.0` has, is a `float64`: read from either with
   jsonutil's `Float64UnmarshalStringOrNumber`, and written as the string, through

@@ -35,6 +35,9 @@ type Document struct {
 	// strings, the names of the object members holding the former: a marshaler for the type writes those alone.
 	UnixTimeMembers []string `json:"unixTimeMembers,omitempty"`
 	UnixDateMembers []string `json:"unixDateMembers,omitempty"`
+	// HasBasicDateFields and BasicDateMembers are the same for dates in ISO 8601's basic form, such as "20260320".
+	HasBasicDateFields bool     `json:"hasBasicDateFields,omitzero"`
+	BasicDateMembers   []string `json:"basicDateMembers,omitempty"`
 
 	// HasServerOverrides is true when any path item names a server of its own,
 	// which is what the generated serverURL helper is for.
@@ -386,6 +389,10 @@ type Field struct {
 	// date-time or date), see [integerGoType]: it is written and read as unix time, not as a string, see
 	// [Document.HasUnixTimeFields] and [Document.UnixTimeMembers].
 	IsUnix bool `json:"isUnix,omitzero"`
+
+	// IsDateBasic is true when Type is civil.Date but the property's schema is a string of format date-basic, such as
+	// "20260320", see [Document.HasBasicDateFields] and [Document.BasicDateMembers].
+	IsDateBasic bool `json:"isDateBasic,omitzero"`
 }
 
 // EnumValue is one member of an enum type.
@@ -445,7 +452,10 @@ type Param struct {
 	// IsUnix is true when Type is "time.Time" or "civil.Date" but the OpenAPI schema itself is an integer (format:
 	// date-time or date), see [integerGoType]. FormatExpr needs this to know whether to encode the param back into an
 	// integer instead of a string.
-	IsUnix      bool   `json:"isUnix,omitzero"`
+	IsUnix bool `json:"isUnix,omitzero"`
+	// IsDateBasic is true when Type is "civil.Date" but the schema is a string of format date-basic, such as
+	// "20260320", which FormatExpr writes and ParseExpr reads.
+	IsDateBasic bool   `json:"isDateBasic,omitzero"`
 	Description string `json:"description,omitzero"`
 	// Item is one element of an array parameter, with v as its variable.
 	Item *Param `json:"item,omitzero"`

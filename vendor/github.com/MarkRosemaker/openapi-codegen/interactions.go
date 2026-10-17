@@ -768,7 +768,9 @@ func scalarLiteral(goType string, v any) (string, bool) {
 		case string:
 			var err error
 			if d, err = time.Parse(time.DateOnly, v); err != nil {
-				return "", false
+				if d, err = time.Parse("20060102", v); err != nil { // ISO 8601's basic form, see ir.Field.IsDateBasic
+					return "", false
+				}
 			}
 		default:
 			return "", false

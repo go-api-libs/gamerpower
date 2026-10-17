@@ -278,7 +278,7 @@ func stringGoType(f openapi.Format) (*GoType, error) {
 		return &GoType{Name: "types.Email"}, nil
 	case openapi.FormatDateTime:
 		return &GoType{Name: "time.Time"}, nil
-	case openapi.FormatDate:
+	case openapi.FormatDate, openapi.FormatDateBasic:
 		return &GoType{Name: "civil.Date"}, nil
 	case openapi.FormatIPv4, openapi.FormatIPv6:
 		return &GoType{Name: "net.IP"}, nil
@@ -585,6 +585,7 @@ func getField(jsonName string, propRef *openapi.Schema, requiredSet map[string]b
 		IsDateTimeOrInt:  isDateTimeOrIntegerOneOf(v),
 		IsStringOrNumber: isStringOrNumberOneOf(v),
 		IsUnix:           isUnix(goType.Name, v),
+		IsDateBasic:      isDateBasic(goType.Name, v),
 	}, nil
 }
 
@@ -596,6 +597,16 @@ func isUnix(goType string, s *openapi.Schema) bool {
 	}
 
 	return (goType == "time.Time" || goType == "civil.Date") && s != nil && s.Type == openapi.TypeInteger
+}
+
+// isDateBasic reports whether a value of the Go type named, from schema s, is a date in ISO 8601's basic form, such as
+// "20260320", or an array of them.
+func isDateBasic(goType string, s *openapi.Schema) bool {
+	for s != nil && s.Type == openapi.TypeArray {
+		s = deref(s.Items)
+	}
+
+	return goType == "civil.Date" && s != nil && s.Format == openapi.FormatDateBasic
 }
 
 func fromObjectSchema(name string, s *openapi.Schema) (*Schema, error) {
@@ -772,6 +783,7 @@ func fromTupleSchema(name string, s *openapi.Schema) (*Schema, error) {
 			Type:        tp.String(),
 			Description: cmp.Or(p.Description, deref(p).Description),
 			IsUnix:      isUnix(tp.Name, deref(p)),
+			IsDateBasic: isDateBasic(tp.Name, deref(p)),
 		}
 	}
 

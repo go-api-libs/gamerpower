@@ -17,18 +17,21 @@ import (
 
 var jsonOpts = json.JoinOptions(
 		json.RejectUnknownMembers(true),
-		{{- if or .HasURLFields .HasDurationFields .HasUnixTimeFields .HasUnixDateFields .UnixTimeMembers .UnixDateMembers }}
+		{{- if or .HasURLFields .HasDurationFields .HasUnixTimeFields .HasUnixDateFields .UnixTimeMembers .UnixDateMembers .HasBasicDateFields .BasicDateMembers }}
 		json.WithMarshalers(json.JoinMarshalers(
 			{{- template "marshalers" . }}
 		)),
 		{{- end }}
-		{{- if or .HasURLFields .HasDateTimeOrIntFields .HasStringOrNumberFields .HasDurationFields .HasUnixTimeFields .HasUnixDateFields .UnixTimeMembers .UnixDateMembers }}
+		{{- if or .HasURLFields .HasDateTimeOrIntFields .HasStringOrNumberFields .HasDurationFields .HasUnixTimeFields .HasUnixDateFields .UnixTimeMembers .UnixDateMembers .HasBasicDateFields .BasicDateMembers }}
 		json.WithUnmarshalers(json.JoinUnmarshalers(
 			{{- with .UnixTimeMembers }}
 			json.UnmarshalFromFunc(jsonutil.TimeUnmarshalIntUnixFor({{ range $i, $m := . }}{{ if $i }}, {{ end }}{{ printf "%q" $m }}{{ end }})),
 			{{- end }}
 			{{- with .UnixDateMembers }}
 			json.UnmarshalFromFunc(jsonutil.DateUnmarshalIntUnixFor({{ range $i, $m := . }}{{ if $i }}, {{ end }}{{ printf "%q" $m }}{{ end }})),
+			{{- end }}
+			{{- with .BasicDateMembers }}
+			json.UnmarshalFromFunc(jsonutil.DateUnmarshalBasicFor({{ range $i, $m := . }}{{ if $i }}, {{ end }}{{ printf "%q" $m }}{{ end }})),
 			{{- end }}
 			{{- if .HasURLFields }}
 			json.UnmarshalFromFunc(jsonutil.URLUnmarshal),
@@ -47,6 +50,9 @@ var jsonOpts = json.JoinOptions(
 			{{- end }}
 			{{- if .HasUnixDateFields }}
 			json.UnmarshalFromFunc(jsonutil.DateUnmarshalIntUnix),
+			{{- end }}
+			{{- if .HasBasicDateFields }}
+			json.UnmarshalFromFunc(jsonutil.DateUnmarshalBasic),
 			{{- end }}
 		)),
 		{{- end }}
@@ -1450,11 +1456,17 @@ func (v *{{.Name}}) unmarshalJSONMember(dec *jsontext.Decoder, name string) (boo
 	{{- if .HasUnixDateFields }}
 	json.MarshalToFunc(jsonutil.DateMarshalIntUnix),
 	{{- end }}
+	{{- if .HasBasicDateFields }}
+	json.MarshalToFunc(jsonutil.DateMarshalBasic),
+	{{- end }}
 	{{- with .UnixTimeMembers }}
 	json.MarshalToFunc(jsonutil.TimeMarshalIntUnixFor({{ range $i, $m := . }}{{ if $i }}, {{ end }}{{ printf "%q" $m }}{{ end }})),
 	{{- end }}
 	{{- with .UnixDateMembers }}
 	json.MarshalToFunc(jsonutil.DateMarshalIntUnixFor({{ range $i, $m := . }}{{ if $i }}, {{ end }}{{ printf "%q" $m }}{{ end }})),
+	{{- end }}
+	{{- with .BasicDateMembers }}
+	json.MarshalToFunc(jsonutil.DateMarshalBasicFor({{ range $i, $m := . }}{{ if $i }}, {{ end }}{{ printf "%q" $m }}{{ end }})),
 	{{- end }}
 {{- end }}
 

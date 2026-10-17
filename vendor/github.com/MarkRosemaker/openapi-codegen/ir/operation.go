@@ -219,9 +219,14 @@ func (p *Param) setType(s *openapi.Schema) error {
 	}
 
 	p.IsUnix = isUnix(p.Type, deref(s))
+	p.IsDateBasic = isDateBasic(p.Type, deref(s))
 
 	if p.BaseType == "" {
 		p.ParseExpr, p.ParseConv, p.ParseErrFree = parseExpr(p.Type, p.IsUnix)
+		if p.IsDateBasic {
+			p.ParseExpr, p.ParseConv, p.ParseErrFree = `time.Parse("20060102", %s)`, "civil.DateOf(%s)", false
+		}
+
 		return nil
 	}
 
@@ -540,6 +545,10 @@ func (p Param) FormatExpr() string {
 	case "civil.Date":
 		if p.IsUnix {
 			return "strconv.FormatInt(" + v + ".In(time.UTC).Unix(), 10)"
+		}
+
+		if p.IsDateBasic {
+			return v + `.In(time.UTC).Format("20060102")`
 		}
 
 		return v + ".String()"

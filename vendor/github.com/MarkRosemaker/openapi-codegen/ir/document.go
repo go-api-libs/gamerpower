@@ -79,7 +79,7 @@ func FromDocument(doc *openapi.Document, packageName, userAgent string, producti
 
 	hasURL, hasDuration, hasDate, hasDateTimeOrInt := needsSpecialImports(schemas, operations)
 
-	unixTimes, unixDates, err := markUnix(schemas)
+	encodings, err := markEncodings(schemas)
 	if err != nil {
 		return nil, fmt.Errorf("components.schemas: %w", err)
 	}
@@ -120,10 +120,12 @@ func FromDocument(doc *openapi.Document, packageName, userAgent string, producti
 		HasStringOrNumberFields: slices.ContainsFunc(schemas, func(s Schema) bool {
 			return slices.ContainsFunc(s.Fields, func(f Field) bool { return f.IsStringOrNumber })
 		}),
-		HasUnixTimeFields: unixTimes.all,
-		HasUnixDateFields: unixDates.all,
-		UnixTimeMembers:   unixTimes.members,
-		UnixDateMembers:   unixDates.members,
+		HasUnixTimeFields:  encodings["time.Time"][encodingUnix].all,
+		HasUnixDateFields:  encodings["civil.Date"][encodingUnix].all,
+		UnixTimeMembers:    encodings["time.Time"][encodingUnix].members,
+		UnixDateMembers:    encodings["civil.Date"][encodingUnix].members,
+		HasBasicDateFields: encodings["civil.Date"][encodingBasic].all,
+		BasicDateMembers:   encodings["civil.Date"][encodingBasic].members,
 		HasServerOverrides: slices.ContainsFunc(operations, func(op Operation) bool {
 			return op.BaseURL != nil
 		}),
