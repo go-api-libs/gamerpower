@@ -10,7 +10,7 @@ github.com/MarkRosemaker/errpath
 # github.com/MarkRosemaker/json2yaml v0.0.0-20261016110315-5aef3717d3ec
 ## explicit; go 1.27
 github.com/MarkRosemaker/json2yaml
-# github.com/MarkRosemaker/jsonutil v0.0.0-20261017163206-9aa3fc5b9fce
+# github.com/MarkRosemaker/jsonutil v0.0.0-20261022123119-c37b7f04825a
 ## explicit; go 1.27
 github.com/MarkRosemaker/jsonutil
 # github.com/MarkRosemaker/openapi v0.0.0-20261017163235-cd74c9692141
@@ -56,7 +56,7 @@ github.com/MarkRosemaker/yaml2json
 # github.com/ettle/strcase v0.2.0
 ## explicit; go 1.12
 github.com/ettle/strcase
-# github.com/go-api-libs/api v0.0.0-20261016110315-20cc10d340f4
+# github.com/go-api-libs/api v0.0.0-20261022123116-10cafa1bd9b1
 ## explicit; go 1.27
 github.com/go-api-libs/api
 # github.com/go-api-libs/types v0.0.0-20261016110315-ed8249d46e89
