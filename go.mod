@@ -11,7 +11,7 @@ tool (
 
 require (
 	github.com/MarkRosemaker/cassette v0.0.0-20261023185554-6ef93f427dfd
-	github.com/MarkRosemaker/jsonutil v0.0.0-20261023182945-bdc3cc16b47f
+	github.com/MarkRosemaker/jsonutil v0.0.0-20261023192140-497ece8b064f
 	github.com/go-api-libs/api v0.0.0-20261022123116-10cafa1bd9b1
 )
 
