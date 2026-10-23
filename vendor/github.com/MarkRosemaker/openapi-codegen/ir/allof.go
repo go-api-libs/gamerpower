@@ -647,7 +647,7 @@ func unsetValue(v *openapi.Schema, tp *GoType) string {
 	}
 
 	if s := deref(v); s != nil && s.Type == openapi.TypeString {
-		if st, err := stringGoType(s.Format); err == nil && (st.Name == "string" || st.Name == "types.Email") {
+		if st := stringGoType(s.Format); st.Name == "string" || st.Name == "types.Email" {
 			return `""`
 		}
 	}

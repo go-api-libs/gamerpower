@@ -177,6 +177,8 @@ How the specification maps onto Go:
   marshaler where every date is in that form, else by the names of the members
   holding them, as for Unix times, through jsonutil's `DateMarshalBasic` and the
   like. A query parameter of the format is sent and read the same way.
+- **Unknown formats** — a format the generator does not know, which OpenAPI 3.1
+  allows, gives the plain type: an `int`, a `float64` or a `string`.
 - **Numbers sent as strings** — a oneOf of a string and a number, as an API that
   sends `"9.5"` and now and then `0.0` has, is a `float64`: read from either with
   jsonutil's `Float64UnmarshalStringOrNumber`, and written as the string, through

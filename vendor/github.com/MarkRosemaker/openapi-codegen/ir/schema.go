@@ -66,11 +66,11 @@ func SchemaGoType(s *openapi.Schema) (*GoType, error) {
 	case openapi.TypeBoolean:
 		return &GoType{Name: "bool"}, nil
 	case openapi.TypeInteger:
-		return integerGoType(s.Format)
+		return integerGoType(s.Format), nil
 	case openapi.TypeNumber:
-		return numberGoType(s.Format)
+		return numberGoType(s.Format), nil
 	case openapi.TypeString:
-		return stringGoType(s.Format)
+		return stringGoType(s.Format), nil
 	case openapi.TypeArray:
 		return arrayGoType(s)
 	case openapi.TypeObject:
@@ -230,60 +230,53 @@ func isOneOfOnly(s *openapi.Schema) bool {
 		!collapsesOneOf(s)
 }
 
-func integerGoType(f openapi.Format) (*GoType, error) {
+func integerGoType(f openapi.Format) *GoType {
 	switch f {
-	case "":
-		return &GoType{Name: "int"}, nil
 	case openapi.FormatInt32:
-		return &GoType{Name: "int32"}, nil
+		return &GoType{Name: "int32"}
 	case openapi.FormatInt64:
-		return &GoType{Name: "int64"}, nil
+		return &GoType{Name: "int64"}
 	case openapi.FormatUint:
-		return &GoType{Name: "uint"}, nil
+		return &GoType{Name: "uint"}
 	case openapi.FormatUint32:
-		return &GoType{Name: "uint32"}, nil
+		return &GoType{Name: "uint32"}
 	case openapi.FormatUint64:
-		return &GoType{Name: "uint64"}, nil
+		return &GoType{Name: "uint64"}
 	case openapi.FormatDuration:
-		return &GoType{Name: "time.Duration"}, nil
+		return &GoType{Name: "time.Duration"}
 	case openapi.FormatDateTime:
-		return &GoType{Name: "time.Time"}, nil
+		return &GoType{Name: "time.Time"}
 	case openapi.FormatDate:
-		return &GoType{Name: "civil.Date"}, nil
-	default:
-		return nil, fmt.Errorf("unsupported integer format: %q", f)
+		return &GoType{Name: "civil.Date"}
+	default: // no format, or one the generator does not know, which says nothing more than the type
+		return &GoType{Name: "int"}
 	}
 }
 
-func numberGoType(f openapi.Format) (*GoType, error) {
-	switch f {
-	case "", openapi.FormatDouble:
-		return &GoType{Name: "float64"}, nil
-	case openapi.FormatFloat:
-		return &GoType{Name: "float32"}, nil
-	default:
-		return nil, fmt.Errorf("unsupported number format: %q", f)
+func numberGoType(f openapi.Format) *GoType {
+	if f == openapi.FormatFloat {
+		return &GoType{Name: "float32"}
 	}
+
+	return &GoType{Name: "float64"}
 }
 
-func stringGoType(f openapi.Format) (*GoType, error) {
+func stringGoType(f openapi.Format) *GoType {
 	switch f {
-	case "", openapi.FormatPassword, openapi.FormatByte, openapi.FormatBinary, openapi.FormatZipCode:
-		return &GoType{Name: "string"}, nil
 	case openapi.FormatUUID:
-		return &GoType{Name: "uuid.UUID"}, nil
+		return &GoType{Name: "uuid.UUID"}
 	case openapi.FormatURI, openapi.FormatURIRef:
-		return &GoType{Name: "url.URL"}, nil
+		return &GoType{Name: "url.URL"}
 	case openapi.FormatEmail:
-		return &GoType{Name: "types.Email"}, nil
+		return &GoType{Name: "types.Email"}
 	case openapi.FormatDateTime:
-		return &GoType{Name: "time.Time"}, nil
+		return &GoType{Name: "time.Time"}
 	case openapi.FormatDate, openapi.FormatDateBasic:
-		return &GoType{Name: "civil.Date"}, nil
+		return &GoType{Name: "civil.Date"}
 	case openapi.FormatIPv4, openapi.FormatIPv6:
-		return &GoType{Name: "net.IP"}, nil
+		return &GoType{Name: "net.IP"}
 	default:
-		return nil, fmt.Errorf("unsupported string format: %q", f)
+		return &GoType{Name: "string"}
 	}
 }
 
@@ -687,11 +680,11 @@ func fromEnumSchema(name string, s *openapi.Schema) (*Schema, error) {
 func enumBaseGoType(t openapi.DataType, f openapi.Format) (*GoType, error) {
 	switch t {
 	case openapi.TypeString:
-		return stringGoType(f)
+		return stringGoType(f), nil
 	case openapi.TypeInteger:
-		return integerGoType(f)
+		return integerGoType(f), nil
 	case openapi.TypeNumber:
-		return numberGoType(f)
+		return numberGoType(f), nil
 	case openapi.TypeBoolean:
 		return &GoType{Name: "bool"}, nil
 	default:
