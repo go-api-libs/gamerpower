@@ -73,19 +73,6 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 //
 //	GET /giveaways
 func (c *Client) ListGiveaways(ctx context.Context) (Giveaways, error) {
-	out, err := c.ListGiveawaysWithResult[Giveaways](ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return *out, nil
-}
-
-// Returns all active giveaways.
-// You can define a custom result to unmarshal the response into.
-//
-//	GET /giveaways
-func (c *Client) ListGiveawaysWithResult[R any](ctx context.Context) (*R, error) {
 	u := c.baseURL.JoinPath("giveaways")
 	req := (&http.Request{
 		Header: http.Header{
@@ -110,19 +97,12 @@ func (c *Client) ListGiveawaysWithResult[R any](ctx context.Context) (*R, error)
 		// OK
 		switch mt, _, _ := strings.Cut(rsp.Header.Get("Content-Type"), ";"); mt {
 		case "application/json":
-			var out R
-
-			// a type of the caller's own declares only what it needs of the response, so it is decoded leniently
-			opts := jsonOptsLenient
-			if _, ok := any(&out).(*Giveaways); ok {
-				opts = jsonOpts
-			}
-
-			if err := json.UnmarshalRead(rsp.Body, &out, opts); err != nil {
+			var out Giveaways
+			if err := json.UnmarshalRead(rsp.Body, &out, jsonOpts); err != nil {
 				return nil, api.WrapDecodingError(rsp, err)
 			}
 
-			return &out, nil
+			return out, nil
 		default:
 			return nil, api.NewErrUnknownContentType(rsp)
 		}
@@ -135,14 +115,6 @@ func (c *Client) ListGiveawaysWithResult[R any](ctx context.Context) (*R, error)
 //
 //	GET /worth
 func (c *Client) GetWorth(ctx context.Context) (*Worth, error) {
-	return c.GetWorthWithResult[Worth](ctx)
-}
-
-// Total live giveaways & worth estimation in US dollars.
-// You can define a custom result to unmarshal the response into.
-//
-//	GET /worth
-func (c *Client) GetWorthWithResult[R any](ctx context.Context) (*R, error) {
 	u := c.baseURL.JoinPath("worth")
 	req := (&http.Request{
 		Header: http.Header{
@@ -167,15 +139,8 @@ func (c *Client) GetWorthWithResult[R any](ctx context.Context) (*R, error) {
 		// OK
 		switch mt, _, _ := strings.Cut(rsp.Header.Get("Content-Type"), ";"); mt {
 		case "application/json":
-			var out R
-
-			// a type of the caller's own declares only what it needs of the response, so it is decoded leniently
-			opts := jsonOptsLenient
-			if _, ok := any(&out).(*Worth); ok {
-				opts = jsonOpts
-			}
-
-			if err := json.UnmarshalRead(rsp.Body, &out, opts); err != nil {
+			var out Worth
+			if err := json.UnmarshalRead(rsp.Body, &out, jsonOpts); err != nil {
 				return nil, api.WrapDecodingError(rsp, err)
 			}
 
