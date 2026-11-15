@@ -11,7 +11,7 @@ tool (
 
 require (
 	github.com/MarkRosemaker/jsonutil v0.0.0-20261114134758-283d23089a18
-	github.com/go-api-libs/api v0.0.0-20261115030148-02c29b673d3a
+	github.com/go-api-libs/api v0.0.0-20261115110221-e8fb0e59f3a9
 )
 
 require (
