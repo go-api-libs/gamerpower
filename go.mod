@@ -10,13 +10,13 @@ tool (
 )
 
 require (
-	github.com/MarkRosemaker/jsonutil v0.0.0-20261117230222-770e095823c9
-	github.com/go-api-libs/api v0.0.0-20261117230632-9c3d6f331ab4
+	github.com/MarkRosemaker/jsonutil v0.0.0-20261118230255-4b04cfc02484
+	github.com/go-api-libs/api v0.0.0-20261118230644-db74d086d284
 )
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
-	github.com/MarkRosemaker/cassette v0.0.0-20261117230519-f54626bd665b // indirect
+	github.com/MarkRosemaker/cassette v0.0.0-20261118230554-38092db8e666 // indirect
 	github.com/MarkRosemaker/errpath v0.0.0-20261117230222-bc2eeb32c6b2 // indirect
 	github.com/MarkRosemaker/json2yaml v0.0.0-20261117230222-23606eee0e4a // indirect
 	github.com/MarkRosemaker/openapi v0.0.0-20261117230614-3b399660e4fe // indirect
