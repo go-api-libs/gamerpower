@@ -11,12 +11,12 @@ tool (
 
 require (
 	github.com/MarkRosemaker/jsonutil v0.0.0-20261118230255-4b04cfc02484
-	github.com/go-api-libs/api v0.0.0-20261124050307-edccc5b8573d
+	github.com/go-api-libs/api v0.0.0-20261124110349-399c57411dab
 )
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
-	github.com/MarkRosemaker/cassette v0.0.0-20261124005723-7b429490730c // indirect
+	github.com/MarkRosemaker/cassette v0.0.0-20261124110309-32c9c69cd6ad // indirect
 	github.com/MarkRosemaker/errpath v0.0.0-20261118230255-99e20cb3445a // indirect
 	github.com/MarkRosemaker/json2yaml v0.0.0-20261118230255-853c75cf2bf9 // indirect
 	github.com/MarkRosemaker/openapi v0.0.0-20261124050252-52a60c76de04 // indirect
