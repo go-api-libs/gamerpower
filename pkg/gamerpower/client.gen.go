@@ -76,6 +76,7 @@ func (c *Client) ListGiveaways(ctx context.Context) (Giveaways, error) {
 	u := c.baseURL.JoinPath("giveaways")
 	req := (&http.Request{
 		Header: http.Header{
+			"Accept":     []string{"application/json"},
 			"User-Agent": []string{c.userAgent},
 		},
 		Host:       u.Host,
@@ -118,6 +119,7 @@ func (c *Client) GetWorth(ctx context.Context) (*Worth, error) {
 	u := c.baseURL.JoinPath("worth")
 	req := (&http.Request{
 		Header: http.Header{
+			"Accept":     []string{"application/json"},
 			"User-Agent": []string{c.userAgent},
 		},
 		Host:       u.Host,
